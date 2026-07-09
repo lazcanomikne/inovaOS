@@ -7,21 +7,22 @@
       <f7-view id="view-captura" tab url="/captura/" />
       <f7-view id="view-tablero" tab url="/tablero/" />
       <f7-view id="view-perfil" tab url="/perfil/" />
-
-      <!-- Pastilla flotante (glass) — navegación inferior estilo iOS -->
-      <nav class="floating-nav">
-        <button
-          v-for="t in tabs"
-          :key="t.id"
-          class="fnav-item"
-          :class="{ active: active === t.id, create: t.id === 'captura' }"
-          @click="show(t.id)"
-        >
-          <i class="f7-icons">{{ t.icon }}</i>
-          <span>{{ t.label }}</span>
-        </button>
-      </nav>
     </f7-views>
+
+    <!-- Pastilla flotante (glass) — FUERA de f7-views para que quede sobre todo -->
+    <nav class="floating-nav">
+      <button
+        v-for="t in tabs"
+        :key="t.id"
+        type="button"
+        class="fnav-item"
+        :class="{ active: active === t.id, create: t.id === 'captura' }"
+        @click="show(t.id)"
+      >
+        <i class="f7-icons">{{ t.icon }}</i>
+        <span>{{ t.label }}</span>
+      </button>
+    </nav>
   </f7-app>
 </template>
 
