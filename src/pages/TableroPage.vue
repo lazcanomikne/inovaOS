@@ -37,7 +37,6 @@
         </li>
       </ul>
     </div>
-    <div style="height: 90px"></div>
   </f7-page>
 </template>
 

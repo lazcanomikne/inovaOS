@@ -40,7 +40,10 @@
     </div>
 
     <div class="block">
-      <f7-button large class="glass-btn" @click="buscarActualizacion">Buscar actualización</f7-button>
+      <f7-button large class="glass-btn" @click="buscarActualizacion" :disabled="actualizando">
+        {{ actualizando ? 'Actualizando…' : 'Actualizar app' }}
+      </f7-button>
+      <div class="update-hint">Trae la última versión sin reinstalar la PWA.</div>
     </div>
   </f7-page>
 </template>
@@ -57,46 +60,40 @@ const iniciales = computed(() =>
   usuario.value.nombre.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 );
 
+const actualizando = ref(false);
+
 async function buscarActualizacion() {
+  if (actualizando.value) return;
+  actualizando.value = true;
   const $f7 = proxy.$f7;
-  const toast = $f7.toast.create({ text: 'Buscando nueva versión…', position: 'center' });
+  const toast = $f7.toast.create({ text: 'Actualizando app…', position: 'center' });
   toast.open();
 
-  if (!('serviceWorker' in navigator)) {
-    location.reload();
-    return;
+  try {
+    // 1. Fuerza a cada SW registrado a re-checar si hay versión nueva
+    //    y activa de inmediato el que esté "en espera".
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(
+        regs.map(async (r) => {
+          try { await r.update(); } catch (_) {}
+          if (r.waiting) r.waiting.postMessage({ type: 'SKIP_WAITING' });
+        })
+      );
+    }
+    // 2. LO CLAVE EN iOS: vacía TODO el precache de Workbox.
+    //    Sin caché, el siguiente fetch baja de la red el index.html nuevo
+    //    (que referencia los assets con hashes nuevos).
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch (_) {
+    /* ignore */
   }
 
-  const reg = await navigator.serviceWorker.getRegistration();
-  if (!reg) {
-    location.reload();
-    return;
-  }
-
-  // Cuando el nuevo service worker tome el control, recargamos una sola vez.
-  // Esto actualiza la app a la última versión SIN reinstalar la PWA.
-  let recargando = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (recargando) return;
-    recargando = true;
-    location.reload();
-  });
-
-  // Fuerza a buscar una versión nueva del SW en el servidor.
-  await reg.update();
-
-  const nuevo = reg.installing || reg.waiting;
-  if (nuevo) {
-    toast.close();
-    $f7.toast.create({ text: 'Instalando última versión…', closeTimeout: 1500, position: 'center' }).open();
-    // Si quedó esperando, le pedimos que active de inmediato.
-    if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-    // El controllerchange de arriba disparará la recarga.
-  } else {
-    // Ya estás en la última versión: recarga suave para traer lo más reciente.
-    toast.close();
-    setTimeout(() => location.reload(), 400);
-  }
+  // 3. Recarga: al no haber caché, obtiene la última versión de red.
+  window.location.reload();
 }
 </script>
 
@@ -110,4 +107,5 @@ async function buscarActualizacion() {
 }
 .perfil-nombre { font-size: 20px; font-weight: 800; }
 .perfil-rol { opacity: 0.7; }
+.update-hint { text-align: center; font-size: 13px; opacity: 0.55; margin-top: 10px; }
 </style>

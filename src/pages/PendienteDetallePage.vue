@@ -46,7 +46,6 @@
           </div>
         </div>
       </div>
-      <div style="height: 90px"></div>
     </template>
   </f7-page>
 </template>
