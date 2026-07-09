@@ -9,20 +9,23 @@
       <f7-view id="view-perfil" tab url="/perfil/" />
     </f7-views>
 
-    <!-- Pastilla flotante (glass) — FUERA de f7-views para que quede sobre todo -->
-    <nav class="floating-nav">
-      <button
-        v-for="t in tabs"
-        :key="t.id"
-        type="button"
-        class="fnav-item"
-        :class="{ active: active === t.id, create: t.id === 'captura' }"
-        @click="show(t.id)"
-      >
-        <i class="f7-icons">{{ t.icon }}</i>
-        <span>{{ t.label }}</span>
-      </button>
-    </nav>
+    <!-- Pastilla flotante (glass) — teletransportada a <body> para que
+         quede fija sobre todo el contenido y no la recorte ningún contenedor. -->
+    <Teleport to="body">
+      <nav class="floating-nav">
+        <button
+          v-for="t in tabs"
+          :key="t.id"
+          type="button"
+          class="fnav-item"
+          :class="{ active: active === t.id, create: t.id === 'captura' }"
+          @click="show(t.id)"
+        >
+          <i class="f7-icons">{{ t.icon }}</i>
+          <span>{{ t.label }}</span>
+        </button>
+      </nav>
+    </Teleport>
   </f7-app>
 </template>
 
