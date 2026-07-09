@@ -39,7 +39,7 @@ export default defineConfig({
         name: 'INOVATECH OS',
         short_name: 'INOVA OS',
         description: 'Delegación y seguimiento de pendientes',
-        theme_color: '#f2f1fb',
+        theme_color: '#5b5bd6',
         background_color: '#f2f1fb',
         display: 'standalone',
         orientation: 'portrait',

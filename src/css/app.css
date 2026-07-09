@@ -70,6 +70,43 @@ body {
   background: transparent !important;
 }
 
+/* ---------- Edge-to-edge en iPhone (PWA instalada) ----------
+   El fondo aurora llega al borde físico (notch / Dynamic Island y home
+   indicator). El contenido lo empuja Framework7 a la zona segura con
+   env(safe-area-inset-*). Requiere viewport-fit=cover (ya está en index.html). */
+html {
+  background-color: #f2f1fb;
+}
+.dark html {
+  background-color: #0b0b13;
+}
+
+@media all and (display-mode: standalone) {
+  /* Nunca blanco en overscroll/rebote arriba o abajo */
+  html,
+  body {
+    background-color: #ece9fb;
+  }
+  .dark html,
+  .dark body {
+    background-color: #0b0b13;
+  }
+
+  /* Franja del notch: tinte de marca para que el reloj/batería (texto
+     blanco por la status bar translúcida) se lean sobre el fondo claro. */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top);
+    background: linear-gradient(180deg, rgba(91, 91, 214, 0.92), rgba(124, 108, 240, 0.45));
+    z-index: 12000;
+    pointer-events: none;
+  }
+}
+
 /* ---------- Utilidad glass reutilizable ---------- */
 .glass {
   background: var(--glass-bg);
