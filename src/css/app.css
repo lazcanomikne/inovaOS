@@ -1,0 +1,184 @@
+/* ============================================================
+   INOVATECH OS · Liquid Glass Theme
+   Capa de estilo por encima del tema iOS de Framework7
+   ============================================================ */
+
+:root {
+  /* Paleta de marca */
+  --inova-primary: #5b5bd6;
+  --inova-primary-2: #7c6cf0;
+  --inova-accent: #a78bfa;
+
+  /* Semáforo de estatus */
+  --st-vencido: #ff453a;
+  --st-hoy: #ff9f0a;
+  --st-manana: #ffd60a;
+  --st-tiempo: #30d158;
+  --st-concluido: #0a84ff;
+  --st-espera: #bf5af2;
+
+  /* Superficies glass */
+  --glass-bg: rgba(255, 255, 255, 0.14);
+  --glass-bg-strong: rgba(255, 255, 255, 0.24);
+  --glass-border: rgba(255, 255, 255, 0.28);
+  --glass-shadow: 0 8px 32px rgba(17, 12, 46, 0.18);
+  --glass-blur: 22px;
+
+  /* Framework7 primary override */
+  --f7-theme-color: var(--inova-primary);
+  --f7-theme-color-rgb: 91, 91, 214;
+  --f7-theme-color-shade: #4a4ac2;
+  --f7-theme-color-tint: #7676e0;
+
+  --f7-page-bg-color: transparent;
+  --f7-bars-bg-color: transparent;
+  --f7-bars-bg-image: none;
+  --f7-navbar-bg-color: transparent;
+  --f7-toolbar-bg-color: transparent;
+}
+
+/* ---------- Fondo global degradado (aurora) ---------- */
+:root,
+.framework7-root,
+body {
+  background-color: #f2f1fb;
+}
+
+body {
+  background-image:
+    radial-gradient(120% 80% at 10% 0%, rgba(124, 108, 240, 0.35) 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 10%, rgba(167, 139, 250, 0.30) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(91, 91, 214, 0.22) 0%, transparent 60%);
+  background-attachment: fixed;
+}
+
+.dark body {
+  background-color: #0b0b13;
+  background-image:
+    radial-gradient(120% 80% at 10% 0%, rgba(124, 108, 240, 0.45) 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 10%, rgba(167, 139, 250, 0.32) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(91, 91, 214, 0.30) 0%, transparent 60%);
+}
+
+/* El aurora vive en el body: mantenemos transparentes las capas de F7
+   para que se vea a través y el efecto glass tenga sobre qué difuminar. */
+.framework7-root,
+.views,
+.view,
+.page,
+.page-content {
+  background: transparent !important;
+}
+
+/* ---------- Utilidad glass reutilizable ---------- */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-strong {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid var(--glass-border);
+}
+
+/* ---------- Navbar / Toolbar glass ---------- */
+.navbar .navbar-bg,
+.toolbar {
+  background: rgba(255, 255, 255, 0.55) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+}
+.dark .navbar .navbar-bg,
+.dark .toolbar {
+  background: rgba(20, 18, 34, 0.55) !important;
+}
+.navbar .navbar-bg:after,
+.toolbar:before,
+.toolbar:after {
+  display: none !important;
+}
+
+.navbar .title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- Tarjetas glass ---------- */
+.card {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 22px;
+  box-shadow: var(--glass-shadow);
+  overflow: hidden;
+}
+.dark .card {
+  background: rgba(30, 27, 46, 0.45);
+}
+
+/* ---------- Listas glass ---------- */
+.list .item-content,
+.list ul {
+  background: transparent;
+}
+.list.glass-list ul {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+/* ---------- Botones ---------- */
+.button-fill,
+.button.button-fill {
+  background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
+  box-shadow: 0 8px 20px rgba(91, 91, 214, 0.35);
+  border-radius: 14px;
+}
+
+.button.glass-btn {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+}
+
+/* ---------- Chips de estatus (semáforo) ---------- */
+.st-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.st-vencido { background: var(--st-vencido); }
+.st-hoy { background: var(--st-hoy); }
+.st-manana { background: var(--st-manana); }
+.st-tiempo { background: var(--st-tiempo); }
+.st-concluido { background: var(--st-concluido); }
+.st-espera { background: var(--st-espera); }
+
+.badge-glass {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Transiciones suaves */
+* {
+  -webkit-tap-highlight-color: transparent;
+}

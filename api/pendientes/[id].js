@@ -1,0 +1,62 @@
+import { db, sendJson, sendError, readBody } from '../_db.js';
+
+function etiqueta(e) {
+  return {
+    aceptado: 'Aceptado', en_progreso: 'En progreso', en_espera: 'En espera',
+    concluido: 'Concluido', aprobado: 'Aprobado', reagendado: 'Reagendado', delegado: 'Delegado',
+  }[e] || e;
+}
+
+// /api/pendientes/:id  → GET detalle+historial · PATCH · DELETE
+export default async function handler(req, res) {
+  const client = db();
+  const { id } = req.query;
+
+  if (req.method === 'GET') {
+    const { rows } = await client.execute({
+      sql: `SELECT p.*, u.nombre AS responsable_nombre
+            FROM pendientes p LEFT JOIN usuarios u ON u.id = p.responsable_id
+            WHERE p.id = ?`,
+      args: [id],
+    });
+    if (!rows.length) return sendError(res, 'No encontrado', 404);
+
+    const { rows: historial } = await client.execute({
+      sql: `SELECT strftime('%H:%M', created_at) AS hora, evento, detalle
+            FROM historial WHERE pendiente_id = ? ORDER BY created_at ASC`,
+      args: [id],
+    });
+    return sendJson(res, { pendiente: rows[0], historial });
+  }
+
+  if (req.method === 'PATCH' || req.method === 'PUT') {
+    const b = readBody(req);
+    const campos = [];
+    const args = [];
+    for (const key of ['titulo','descripcion','prioridad','area','responsable_id','fecha_compromiso','estatus','comentario_cierre']) {
+      if (b[key] !== undefined) { campos.push(`${key} = ?`); args.push(b[key]); }
+    }
+    if (!campos.length) return sendError(res, 'Nada que actualizar');
+    campos.push(`updated_at = datetime('now')`);
+    args.push(id);
+
+    await client.execute({ sql: `UPDATE pendientes SET ${campos.join(', ')} WHERE id = ?`, args });
+
+    if (b.estatus) {
+      await client.execute({
+        sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, ?, ?, ?)`,
+        args: [id, etiqueta(b.estatus), b.detalle ?? null, b.actor_id ?? null],
+      });
+    }
+    const { rows } = await client.execute({ sql: 'SELECT * FROM pendientes WHERE id = ?', args: [id] });
+    return sendJson(res, rows[0]);
+  }
+
+  if (req.method === 'DELETE') {
+    await client.execute({ sql: 'DELETE FROM pendientes WHERE id = ?', args: [id] });
+    return sendJson(res, { ok: true });
+  }
+
+  res.setHeader('Allow', 'GET, PATCH, PUT, DELETE');
+  return sendError(res, 'Método no permitido', 405);
+}
