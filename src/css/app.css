@@ -87,20 +87,62 @@ body {
 }
 
 /* ---------- Navbar / Toolbar glass ---------- */
-.navbar .navbar-bg,
-.toolbar {
-  background: rgba(255, 255, 255, 0.55) !important;
+.navbar .navbar-bg {
+  background: rgba(255, 255, 255, 0.6) !important;
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%);
 }
-.dark .navbar .navbar-bg,
-.dark .toolbar {
+.dark .navbar .navbar-bg {
   background: rgba(20, 18, 34, 0.55) !important;
 }
 .navbar .navbar-bg:after,
 .toolbar:before,
 .toolbar:after {
   display: none !important;
+}
+
+/* ---------- Tab bar estilo Instagram (glass, solo iconos) ---------- */
+.ig-tabbar {
+  --f7-tabbar-link-active-color: var(--inova-primary);
+  --f7-tabbar-link-inactive-color: rgba(60, 60, 67, 0.45);
+  height: calc(60px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(255, 255, 255, 0.72) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(200%);
+  backdrop-filter: blur(26px) saturate(200%);
+  border-top: 0.5px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 -1px 20px rgba(17, 12, 46, 0.06);
+}
+.dark .ig-tabbar {
+  --f7-tabbar-link-inactive-color: rgba(235, 235, 245, 0.4);
+  background: rgba(18, 16, 30, 0.7) !important;
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+.ig-tabbar .link {
+  flex: 1;
+  transition: transform 0.15s ease;
+}
+.ig-tabbar .link:active { transform: scale(0.88); }
+.ig-tabbar i.f7-icons { font-size: 27px; }
+
+/* Botón central de crear (como el "+" de Instagram) */
+.ig-tabbar .tab-create .create-btn {
+  width: 44px;
+  height: 34px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(91, 91, 214, 0.4);
+}
+.ig-tabbar .tab-create .create-btn i {
+  color: #fff;
+  font-size: 24px;
+  font-weight: 700;
+}
+.ig-tabbar .tab-create.tab-link-active .create-btn {
+  box-shadow: 0 6px 20px rgba(91, 91, 214, 0.55);
 }
 
 .navbar .title {
@@ -176,6 +218,24 @@ body {
   padding: 3px 10px;
   font-size: 12px;
   font-weight: 600;
+}
+
+/* ---------- Ajuste en iPhone: sin scroll horizontal ---------- */
+html,
+body,
+.framework7-root {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+.block,
+.block-title {
+  box-sizing: border-box;
+}
+/* Imágenes y contenido nunca desbordan */
+img,
+.card,
+.list {
+  max-width: 100%;
 }
 
 /* Transiciones suaves */

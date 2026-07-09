@@ -1,13 +1,15 @@
 <template>
   <f7-app v-bind="f7params">
     <f7-views tabs class="safe-areas">
-      <!-- Tab bar inferior estilo iOS (glass) -->
-      <f7-toolbar tabbar labels bottom class="glass-tabbar">
-        <f7-link tab-link="#view-home" tab-link-active icon-f7="house_fill" text="Inicio" />
-        <f7-link tab-link="#view-pendientes" icon-f7="checkmark_seal_fill" text="Pendientes" />
-        <f7-link tab-link="#view-captura" icon-f7="plus_circle_fill" text="Capturar" class="tab-captura" />
-        <f7-link tab-link="#view-tablero" icon-f7="chart_pie_fill" text="Tablero" />
-        <f7-link tab-link="#view-perfil" icon-f7="person_crop_circle_fill" text="Perfil" />
+      <!-- Tab bar inferior estilo Instagram: solo iconos, glass translúcido -->
+      <f7-toolbar tabbar bottom class="ig-tabbar">
+        <f7-link tab-link="#view-home" tab-link-active icon-f7="house_fill" />
+        <f7-link tab-link="#view-pendientes" icon-f7="square_list_fill" />
+        <f7-link tab-link="#view-captura" class="tab-create">
+          <span class="create-btn"><i class="f7-icons">plus</i></span>
+        </f7-link>
+        <f7-link tab-link="#view-tablero" icon-f7="chart_pie_fill" />
+        <f7-link tab-link="#view-perfil" icon-f7="person_fill" />
       </f7-toolbar>
 
       <!-- Cada tab es un stack de navegación independiente -->
@@ -27,7 +29,7 @@ import routes from '@/js/routes.js';
 const f7params = reactive({
   name: 'INOVATECH OS',
   theme: 'ios',
-  darkMode: 'auto',
+  darkMode: false, // Modo claro por defecto
   colors: { primary: '#5b5bd6' },
   routes,
   view: {
@@ -37,16 +39,3 @@ const f7params = reactive({
   touch: { tapHold: true },
 });
 </script>
-
-<style>
-.glass-tabbar {
-  --f7-tabbar-link-active-color: var(--inova-primary);
-}
-.tab-captura i {
-  font-size: 30px;
-  background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-</style>

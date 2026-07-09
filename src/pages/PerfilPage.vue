@@ -59,11 +59,44 @@ const iniciales = computed(() =>
 
 async function buscarActualizacion() {
   const $f7 = proxy.$f7;
-  if ('serviceWorker' in navigator) {
-    const reg = await navigator.serviceWorker.getRegistration();
-    if (reg) { await reg.update(); }
+  const toast = $f7.toast.create({ text: 'Buscando nueva versión…', position: 'center' });
+  toast.open();
+
+  if (!('serviceWorker' in navigator)) {
+    location.reload();
+    return;
   }
-  $f7.toast.create({ text: 'Buscando nueva versión…', closeTimeout: 1800, position: 'center' }).open();
+
+  const reg = await navigator.serviceWorker.getRegistration();
+  if (!reg) {
+    location.reload();
+    return;
+  }
+
+  // Cuando el nuevo service worker tome el control, recargamos una sola vez.
+  // Esto actualiza la app a la última versión SIN reinstalar la PWA.
+  let recargando = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (recargando) return;
+    recargando = true;
+    location.reload();
+  });
+
+  // Fuerza a buscar una versión nueva del SW en el servidor.
+  await reg.update();
+
+  const nuevo = reg.installing || reg.waiting;
+  if (nuevo) {
+    toast.close();
+    $f7.toast.create({ text: 'Instalando última versión…', closeTimeout: 1500, position: 'center' }).open();
+    // Si quedó esperando, le pedimos que active de inmediato.
+    if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    // El controllerchange de arriba disparará la recarga.
+  } else {
+    // Ya estás en la última versión: recarga suave para traer lo más reciente.
+    toast.close();
+    setTimeout(() => location.reload(), 400);
+  }
 }
 </script>
 
