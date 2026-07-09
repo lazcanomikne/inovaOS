@@ -33,7 +33,13 @@
         <li class="item-content">
           <div class="item-inner">
             <div class="item-title">Versión</div>
-            <div class="item-after">{{ version }}</div>
+            <div class="item-after">v{{ version }}</div>
+          </div>
+        </li>
+        <li class="item-content">
+          <div class="item-inner">
+            <div class="item-title">Build</div>
+            <div class="item-after">{{ buildId }}</div>
           </div>
         </li>
       </ul>
@@ -55,6 +61,7 @@ const { proxy } = getCurrentInstance();
 const usuario = ref({ nombre: 'Carolina G.', rol: 'Dirección General' });
 const notif = ref(true);
 const version = __APP_VERSION__ || '0.1.0';
+const buildId = __BUILD_ID__ || '—';
 
 const iniciales = computed(() =>
   usuario.value.nombre.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
@@ -66,34 +73,35 @@ async function buscarActualizacion() {
   if (actualizando.value) return;
   actualizando.value = true;
   const $f7 = proxy.$f7;
-  const toast = $f7.toast.create({ text: 'Actualizando app…', position: 'center' });
-  toast.open();
+  $f7.toast.create({ text: 'Actualizando app…', position: 'center', closeTimeout: 4000 }).open();
+
+  // Recarga forzando red (sin caché HTTP). Se llama sí o sí.
+  const recargar = () => {
+    const url = location.pathname + '?v=' + Date.now();
+    location.replace(url);
+  };
+  // Salvavidas: si algo se cuelga en iOS (p. ej. reg.update sin responder),
+  // recarga igual a los 3.5s para que el botón nunca se quede pegado.
+  const salvavidas = setTimeout(recargar, 3500);
 
   try {
-    // 1. Fuerza a cada SW registrado a re-checar si hay versión nueva
-    //    y activa de inmediato el que esté "en espera".
-    if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(
-        regs.map(async (r) => {
-          try { await r.update(); } catch (_) {}
-          if (r.waiting) r.waiting.postMessage({ type: 'SKIP_WAITING' });
-        })
-      );
-    }
-    // 2. LO CLAVE EN iOS: vacía TODO el precache de Workbox.
-    //    Sin caché, el siguiente fetch baja de la red el index.html nuevo
-    //    (que referencia los assets con hashes nuevos).
+    // 1. Borra TODO el precache de Workbox (lo más importante en iOS).
     if (window.caches) {
       const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
+      await Promise.all(keys.map((k) => caches.delete(k).catch(() => {})));
+    }
+    // 2. Desregistra los service workers = REFRESH COMPLETO. Al recargar,
+    //    la app baja todo de red y registra el SW nuevo automáticamente.
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister().catch(() => {})));
     }
   } catch (_) {
     /* ignore */
   }
 
-  // 3. Recarga: al no haber caché, obtiene la última versión de red.
-  window.location.reload();
+  clearTimeout(salvavidas);
+  recargar();
 }
 </script>
 

@@ -2,10 +2,17 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const pkg = require('./package.json');
+// Build id único por compilación (UTC), para comprobar que la app actualizó.
+const buildId = new Date().toISOString().replace('T', ' ').slice(0, 16);
 
 export default defineConfig({
   define: {
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '0.1.0'),
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __BUILD_ID__: JSON.stringify(buildId),
   },
   plugins: [
     vue(),
