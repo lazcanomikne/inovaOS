@@ -7,3 +7,5 @@ dev-dist/
 *.local
 .DS_Store
 scratch_icon/
+.vercel
+.env*
