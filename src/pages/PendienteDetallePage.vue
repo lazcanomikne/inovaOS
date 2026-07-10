@@ -167,7 +167,7 @@ function editar() {
 async function patch(cambios) {
   guardando.value = true;
   try {
-    await api.pendientes.update(id, { ...cambios, actor_id: store.usuario.id });
+    await api.pendientes.update(id, cambios); // el autor lo pone el servidor
     // refrescar() dispara el watch de store.tick, que recarga esta página
     // (historial + estatus) y también Inicio/Lista/Tablero. Una sola petición.
     refrescar();

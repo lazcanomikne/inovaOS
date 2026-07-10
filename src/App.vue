@@ -1,31 +1,38 @@
 <template>
   <f7-app v-bind="f7params">
-    <f7-views tabs class="safe-areas">
-      <!-- Cada tab es un stack de navegación independiente -->
-      <f7-view id="view-home" main tab tab-active url="/" />
-      <f7-view id="view-pendientes" tab url="/pendientes/" />
-      <f7-view id="view-captura" tab url="/captura/" />
-      <f7-view id="view-tablero" tab url="/tablero/" />
-      <f7-view id="view-perfil" tab url="/perfil/" />
-    </f7-views>
+    <!-- Mientras preguntamos al servidor si hay sesión, no parpadeamos el login -->
+    <div v-if="store.comprobandoSesion" class="arranque">
+      <f7-preloader size="32" />
+    </div>
 
-    <!-- Pastilla flotante (glass) — teletransportada a <body> para que
-         quede fija sobre todo el contenido y no la recorte ningún contenedor. -->
-    <Teleport to="body">
-      <nav class="floating-nav">
-        <button
-          v-for="t in tabs"
-          :key="t.id"
-          type="button"
-          class="fnav-item"
-          :class="{ active: active === t.id, create: t.id === 'captura' }"
-          @click="show(t.id)"
-        >
-          <i class="f7-icons">{{ t.icon }}</i>
-          <span>{{ t.label }}</span>
-        </button>
-      </nav>
-    </Teleport>
+    <LoginPage v-else-if="!store.autenticado" />
+
+    <template v-else>
+      <f7-views tabs class="safe-areas">
+        <f7-view id="view-home" main tab tab-active url="/" />
+        <f7-view id="view-pendientes" tab url="/pendientes/" />
+        <f7-view id="view-captura" tab url="/captura/" />
+        <f7-view id="view-tablero" tab url="/tablero/" />
+        <f7-view id="view-perfil" tab url="/perfil/" />
+      </f7-views>
+
+      <!-- Pastilla flotante (glass) — en <body> para que quede sobre todo -->
+      <Teleport to="body">
+        <nav class="floating-nav">
+          <button
+            v-for="t in tabs"
+            :key="t.id"
+            type="button"
+            class="fnav-item"
+            :class="{ active: active === t.id, create: t.id === 'captura' }"
+            @click="show(t.id)"
+          >
+            <i class="f7-icons">{{ t.icon }}</i>
+            <span>{{ t.label }}</span>
+          </button>
+        </nav>
+      </Teleport>
+    </template>
   </f7-app>
 </template>
 
@@ -33,11 +40,14 @@
 import { reactive, ref, onMounted } from 'vue';
 import { f7, f7ready } from 'framework7-vue';
 import routes from '@/js/routes.js';
+import { api } from '@/js/api.js';
+import { store, setSesion } from '@/js/store.js';
+import LoginPage from '@/pages/LoginPage.vue';
 
 const f7params = reactive({
   name: 'INOVATECH OS',
   theme: 'ios',
-  darkMode: false, // Modo claro por defecto
+  darkMode: false,
   colors: { primary: '#5b5bd6' },
   routes,
   view: { iosDynamicNavbar: true, pushState: false },
@@ -59,13 +69,32 @@ function show(id) {
 }
 
 // Mantiene el resaltado de la pastilla sincronizado, incluso cuando otra
-// pantalla cambia de tab por código (p. ej. al guardar un pendiente).
-onMounted(() => {
+// pantalla cambia de tab por código.
+onMounted(async () => {
   f7ready(() => {
     f7.on('tabShow', (tabEl) => {
       const id = tabEl?.id?.replace('view-', '');
       if (id) active.value = id;
     });
   });
+
+  // ¿Hay cookie de sesión válida?
+  try {
+    const { usuario } = await api.auth.yo();
+    setSesion(usuario);
+  } catch {
+    setSesion(null); // 401: se muestra el login
+  } finally {
+    store.comprobandoSesion = false;
+  }
 });
 </script>
+
+<style scoped>
+.arranque {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>

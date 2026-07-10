@@ -182,7 +182,7 @@ async function guardar() {
   if (!puedeGuardar.value) return;
   guardando.value = true;
   try {
-    await api.pendientes.update(id, { ...cambios.value, actor_id: store.usuario.id });
+    await api.pendientes.update(id, cambios.value); // el autor lo pone el servidor
     refrescar();
     f7.toast.create({ text: 'Cambios guardados ✓', closeTimeout: 1800, position: 'center' }).open();
     props.f7router.back();

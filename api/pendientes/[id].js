@@ -1,4 +1,6 @@
 import { db, sendJson, sendError, readBody, nombreUsuario } from '../_db.js';
+import { requiereSesion } from '../_auth.js';
+import { validarActualizacion, puedeEliminar } from '../_permisos.js';
 
 function etiqueta(e) {
   return {
@@ -7,8 +9,14 @@ function etiqueta(e) {
   }[e] || e;
 }
 
-// /api/pendientes/:id  → GET detalle+historial · PATCH · DELETE
+const traer = async (client, id) =>
+  (await client.execute({ sql: 'SELECT * FROM pendientes WHERE id = ?', args: [id] })).rows[0] ?? null;
+
+// /api/pendientes/:id  → GET detalle · PATCH · DELETE   (requiere sesión)
 export default async function handler(req, res) {
+  const sesion = await requiereSesion(req, res);
+  if (!sesion) return;
+
   const client = db();
   const { id } = req.query;
 
@@ -40,47 +48,56 @@ export default async function handler(req, res) {
     const b = readBody(req);
     const EDITABLES = ['titulo', 'descripcion', 'prioridad', 'area', 'responsable_id', 'fecha_compromiso', 'comentario_cierre'];
 
+    const actual = await traer(client, id);
+    if (!actual) return sendError(res, 'No encontrado', 404);
+
     const campos = [];
     const args = [];
     const editados = [];
     for (const key of EDITABLES) {
       if (b[key] !== undefined) { campos.push(`${key} = ?`); args.push(b[key]); editados.push(key); }
     }
-    // Al asignar responsable a algo que estaba sin asignar, pasa a 'delegado'.
-    let estatus = b.estatus;
-    if (!estatus && b.responsable_id) {
-      const actual = await client.execute({ sql: 'SELECT estatus FROM pendientes WHERE id = ?', args: [id] });
-      if (actual.rows[0]?.estatus === 'capturado') estatus = 'delegado';
-    }
-    if (estatus) { campos.push('estatus = ?'); args.push(estatus); }
 
+    // Al asignar responsable a algo sin asignar, pasa a 'delegado'.
+    let estatus = b.estatus;
+    if (!estatus && b.responsable_id && actual.estatus === 'capturado') estatus = 'delegado';
+
+    // Autorización: reagendar cambia la fecha, así que no cuenta como "edición".
+    const camposDeEdicion = editados.filter((k) => !(estatus === 'reagendado' && k === 'fecha_compromiso'));
+    const negado = validarActualizacion(actual, sesion, {
+      estatus,
+      editaCampos: camposDeEdicion.length > 0,
+    });
+    if (negado) return sendError(res, negado, 403);
+
+    if (estatus) { campos.push('estatus = ?'); args.push(estatus); }
     if (!campos.length) return sendError(res, 'Nada que actualizar');
     campos.push(`updated_at = datetime('now')`);
     args.push(id);
 
     await client.execute({ sql: `UPDATE pendientes SET ${campos.join(', ')} WHERE id = ?`, args });
 
-    const actor = await nombreUsuario(client, b.actor_id);
-    const porActor = actor ? `por ${actor}` : null;
-
+    const porActor = `por ${sesion.nombre}`;
     if (estatus) {
       await client.execute({
         sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, ?, ?, ?)`,
-        args: [id, etiqueta(estatus), b.detalle ?? porActor, b.actor_id ?? null],
+        args: [id, etiqueta(estatus), b.detalle ?? porActor, sesion.id],
       });
     } else if (editados.length) {
-      // Edición sin cambio de estatus: queda registrada en la trazabilidad.
       await client.execute({
         sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, 'Editado', ?, ?)`,
-        args: [id, [porActor, `campos: ${editados.join(', ')}`].filter(Boolean).join(' · '), b.actor_id ?? null],
+        args: [id, `${porActor} · campos: ${editados.join(', ')}`, sesion.id],
       });
     }
 
-    const { rows } = await client.execute({ sql: 'SELECT * FROM pendientes WHERE id = ?', args: [id] });
-    return sendJson(res, rows[0]);
+    return sendJson(res, await traer(client, id));
   }
 
   if (req.method === 'DELETE') {
+    const actual = await traer(client, id);
+    if (!actual) return sendError(res, 'No encontrado', 404);
+    if (!puedeEliminar(actual, sesion)) return sendError(res, 'Sólo quien delegó el pendiente puede eliminarlo', 403);
+
     await client.execute({ sql: 'DELETE FROM pendientes WHERE id = ?', args: [id] });
     return sendJson(res, { ok: true });
   }

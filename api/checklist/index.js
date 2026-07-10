@@ -1,8 +1,12 @@
 import { db, sendJson, sendError, readBody } from '../_db.js';
+import { requiereSesion } from '../_auth.js';
 
 // /api/checklist?pendiente_id=1  → GET lista
 // /api/checklist                 → POST { pendiente_id, texto }
 export default async function handler(req, res) {
+  const sesion = await requiereSesion(req, res);
+  if (!sesion) return;
+
   const client = db();
 
   if (req.method === 'GET') {

@@ -1,22 +1,22 @@
 import { reactive } from 'vue';
 
-// Estado compartido mínimo entre pantallas.
+// Estado compartido entre pantallas.
 export const store = reactive({
-  // Usuario en sesión. Por ahora se elige a mano (no hay login todavía).
-  usuario: { id: 1, nombre: 'Carolina G.', rol: 'direccion' },
+  // Sesión. `usuario` sale del servidor (cookie HttpOnly), nunca se inventa aquí.
+  usuario: null,
+  autenticado: false,
+  comprobandoSesion: true,
 
-  // Catálogo de usuarios (se carga una vez desde /api/usuarios).
+  // Catálogo de usuarios (para elegir responsables).
   usuarios: [],
 
-  // Filtro que la lista de Pendientes debe aplicar (lo fija Inicio al tocar
-  // una tarjeta del semáforo).
+  // Filtro que la lista de Pendientes debe aplicar (lo fija Inicio).
   filtro: 'todos',
 
   // Contador que las pantallas observan para recargar datos.
   tick: 0,
 });
 
-// Avisa a las pantallas que hay datos nuevos (tras crear/editar un pendiente).
 export function refrescar() {
   store.tick += 1;
 }
@@ -25,10 +25,29 @@ export function setUsuarios(lista) {
   store.usuarios = lista;
 }
 
-export function setUsuario(u) {
-  store.usuario = { id: u.id, nombre: u.nombre, rol: u.rol };
-}
-
 export function setFiltro(f) {
   store.filtro = f;
 }
+
+export function setSesion(usuario) {
+  store.usuario = usuario;
+  store.autenticado = !!usuario;
+}
+
+/** Limpia el estado local. La cookie la borra el servidor en /api/auth/salir. */
+export function limpiarSesion() {
+  store.usuario = null;
+  store.autenticado = false;
+  store.usuarios = [];
+  store.filtro = 'todos';
+}
+
+/* Recordamos el último correo para ofrecer Face ID directo la próxima vez.
+   Es sólo una comodidad: no da acceso a nada por sí solo. */
+const CLAVE_EMAIL = 'inova_ultimo_email';
+export const ultimoEmail = () => {
+  try { return localStorage.getItem(CLAVE_EMAIL) || ''; } catch { return ''; }
+};
+export const recordarEmail = (email) => {
+  try { localStorage.setItem(CLAVE_EMAIL, email); } catch { /* modo privado */ }
+};

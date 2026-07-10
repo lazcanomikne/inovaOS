@@ -1,7 +1,11 @@
 import { db, sendJson, sendError, readBody } from '../_db.js';
+import { requiereSesion } from '../_auth.js';
 
 // /api/checklist/:itemId  → PATCH { completado, texto } · DELETE
 export default async function handler(req, res) {
+  const sesion = await requiereSesion(req, res);
+  if (!sesion) return;
+
   const client = db();
   const { itemId } = req.query;
 

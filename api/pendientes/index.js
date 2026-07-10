@@ -1,7 +1,11 @@
 import { db, sendJson, sendError, readBody, nombreUsuario } from '../_db.js';
+import { requiereSesion } from '../_auth.js';
 
-// /api/pendientes  → GET lista · POST crear/delegar
+// /api/pendientes  → GET lista · POST crear/delegar   (requiere sesión)
 export default async function handler(req, res) {
+  const sesion = await requiereSesion(req, res);
+  if (!sesion) return;
+
   const client = db();
 
   if (req.method === 'GET') {
@@ -22,6 +26,9 @@ export default async function handler(req, res) {
     const b = readBody(req);
     if (!b.titulo) return sendError(res, 'El título es obligatorio');
 
+    // El autor sale de la sesión, nunca del cuerpo de la petición.
+    const creadoPor = sesion.id;
+
     const { rows } = await client.execute({
       sql: `INSERT INTO pendientes
         (titulo, descripcion, cliente, tipo, prioridad, area, origen, creado_por, responsable_id, fecha_compromiso, estatus)
@@ -34,7 +41,7 @@ export default async function handler(req, res) {
         b.prioridad ?? 'Media',
         b.area ?? null,
         b.origen ?? 'manual',
-        b.creado_por ?? 1,
+        creadoPor,
         b.responsable_id ?? null,
         b.fecha_compromiso ?? null,
         b.responsable_id ? 'delegado' : 'capturado',
@@ -42,16 +49,15 @@ export default async function handler(req, res) {
     });
     const pendiente = rows[0];
 
-    const autor = await nombreUsuario(client, b.creado_por ?? 1);
     await client.execute({
       sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, 'Creado', ?, ?)`,
-      args: [pendiente.id, autor ? `por ${autor}` : null, b.creado_por ?? 1],
+      args: [pendiente.id, `por ${sesion.nombre}`, creadoPor],
     });
     if (b.responsable_id) {
       const responsable = await nombreUsuario(client, b.responsable_id);
       await client.execute({
         sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, 'Delegado', ?, ?)`,
-        args: [pendiente.id, responsable ? `a ${responsable}` : null, b.creado_por ?? 1],
+        args: [pendiente.id, responsable ? `a ${responsable}` : null, creadoPor],
       });
     }
     return sendJson(res, pendiente, 201);

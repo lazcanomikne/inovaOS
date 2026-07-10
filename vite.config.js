@@ -29,9 +29,11 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         // El API nunca se cachea de forma agresiva: siempre red primero.
+        // /api/auth queda FUERA de la caché: una respuesta de sesión guardada
+        // dejaría al usuario "dentro" (o "fuera") sin que sea cierto.
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/auth'),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'inovaos-api',

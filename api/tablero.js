@@ -1,7 +1,11 @@
 import { db, sendJson, colorEstatus } from './_db.js';
+import { requiereSesion } from './_auth.js';
 
 // /api/tablero  → resumen semáforo + próximos a vencer
 export default async function handler(req, res) {
+  const sesion = await requiereSesion(req, res);
+  if (!sesion) return;
+
   const client = db();
   const { rows } = await client.execute(`
     SELECT p.*, u.nombre AS responsable_nombre

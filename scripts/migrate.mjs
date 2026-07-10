@@ -1,17 +1,20 @@
-// Ejecuta las migraciones/seed contra Turso (libSQL).
-//   npm run db:migrate   → aplica esquema (0001)
-//   npm run db:seed      → aplica esquema + datos de ejemplo (0001 + 0002)
+// Aplica migraciones a Turso (libSQL).
 //
-// Requiere en el entorno (o en .env):
-//   TURSO_DATABASE_URL=libsql://...
-//   TURSO_AUTH_TOKEN=...
+//   npm run db:migrate                → esquema base (0001)   ⚠️ hace DROP TABLE
+//   npm run db:seed                   → 0001 + datos ejemplo (0002)  ⚠️ destructivo
+//   node scripts/migrate.mjs 0003_auth.sql   → aplica sólo ese archivo (no destructivo)
+//
+// Requiere TURSO_DATABASE_URL y TURSO_AUTH_TOKEN (en .env o el entorno).
 import { createClient } from '@libsql/client';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const seed = process.argv.includes('--seed');
+
+const args = process.argv.slice(2);
+const seed = args.includes('--seed');
+const explicitos = args.filter((a) => !a.startsWith('--'));
 
 const url = process.env.TURSO_DATABASE_URL;
 const authToken = process.env.TURSO_AUTH_TOKEN;
@@ -21,10 +24,14 @@ if (!url) {
   process.exit(1);
 }
 
-const client = createClient({ url, authToken });
+// Si se pasan archivos, se aplican esos. Si no, el comportamiento clásico.
+const archivos = explicitos.length ? explicitos : seed ? ['0001_init.sql', '0002_seed.sql'] : ['0001_init.sql'];
 
-const archivos = ['0001_init.sql'];
-if (seed) archivos.push('0002_seed.sql');
+if (!explicitos.length) {
+  console.log('⚠️  0001_init.sql hace DROP TABLE: se borrarán los datos existentes.');
+}
+
+const client = createClient({ url, authToken });
 
 for (const archivo of archivos) {
   const sql = readFileSync(join(__dirname, '..', 'migrations', archivo), 'utf8');
@@ -33,4 +40,4 @@ for (const archivo of archivos) {
   console.log('OK');
 }
 
-console.log(seed ? '✓ Esquema + datos aplicados.' : '✓ Esquema aplicado.');
+console.log('✓ Listo.');

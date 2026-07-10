@@ -274,7 +274,6 @@ async function delegar() {
       prioridad: form.value.prioridad,
       area: form.value.area.trim() || null,
       origen: metodo.value,
-      creado_por: store.usuario.id,
     });
     f7.toast.create({ text: 'Pendiente guardado ✓', closeTimeout: 2000, position: 'center' }).open();
     reset();

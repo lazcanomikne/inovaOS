@@ -9,3 +9,4 @@ dev-dist/
 scratch_icon/
 .vercel
 .env*
+scratch_*
