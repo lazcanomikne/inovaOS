@@ -2,6 +2,9 @@
   <f7-page name="pendiente-detalle">
     <f7-navbar transparent back-link="Atrás">
       <f7-nav-title>Detalle</f7-nav-title>
+      <f7-nav-right v-if="p && puedeEditar(p, store.usuario)">
+        <f7-link icon-f7="square_pencil" @click="editar" />
+      </f7-nav-right>
     </f7-navbar>
 
     <div v-if="loading" class="block text-align-center"><f7-preloader /></div>
@@ -29,16 +32,33 @@
               <div><i class="f7-icons">person_fill</i> {{ p.responsable_nombre || 'Sin asignar' }}</div>
               <div><i class="f7-icons">calendar</i> Vence {{ formatFecha(p.fecha_compromiso) }}</div>
               <div v-if="p.area"><i class="f7-icons">square_grid_2x2_fill</i> {{ p.area }}</div>
+              <div v-if="p.creador_nombre" class="det-creador">
+                <i class="f7-icons">person_crop_circle</i> Delegado por {{ p.creador_nombre }}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Acción del flujo (pasos 3-6) -->
-      <div v-if="accion" class="block">
-        <f7-button large fill :color="accion.color || undefined" @click="cambiar(accion.estatus)" :disabled="guardando">
-          {{ guardando ? 'Guardando…' : accion.texto }}
+      <!-- Acciones del flujo, según el rol de quien mira (pasos 2-6) -->
+      <div class="block acciones">
+        <f7-button
+          v-for="a in acciones"
+          :key="a.id"
+          large
+          :fill="!!a.fill"
+          :class="{ 'glass-btn': !a.fill }"
+          :color="a.color || undefined"
+          :disabled="guardando"
+          @click="ejecutar(a)"
+        >
+          {{ guardando ? 'Guardando…' : a.texto }}
         </f7-button>
+
+        <div v-if="!acciones.length" class="sin-acciones glass">
+          <i class="f7-icons">clock</i>
+          <span>{{ motivoSinAcciones(p, store.usuario) }}</span>
+        </div>
       </div>
 
       <!-- Checklist (paso 4) -->
@@ -50,11 +70,7 @@
         <ul>
           <li v-for="item in checklist" :key="item.id">
             <label class="item-checkbox item-content">
-              <input
-                type="checkbox"
-                :checked="!!item.completado"
-                @change="toggleItem(item, $event.target.checked)"
-              />
+              <input type="checkbox" :checked="!!item.completado" @change="toggleItem(item, $event.target.checked)" />
               <i class="icon icon-checkbox"></i>
               <div class="item-inner">
                 <div class="item-title" :class="{ tachado: item.completado }">{{ item.texto }}</div>
@@ -64,12 +80,7 @@
           <li class="item-content item-input">
             <div class="item-inner">
               <div class="item-input-wrap">
-                <input
-                  type="text"
-                  v-model="nuevoItem"
-                  placeholder="Añadir paso…"
-                  @keyup.enter="agregarItem"
-                />
+                <input type="text" v-model="nuevoItem" placeholder="Añadir paso…" @keyup.enter="agregarItem" />
               </div>
             </div>
           </li>
@@ -89,18 +100,25 @@
         </div>
         <div v-if="!historial.length" class="block text-color-gray">Sin eventos aún.</div>
       </div>
+
+      <!-- Sólo el creador (o dirección) puede eliminar -->
+      <div v-if="puedeEliminar(p, store.usuario)" class="block">
+        <f7-button class="glass-btn" color="red" @click="eliminar">Eliminar pendiente</f7-button>
+      </div>
     </template>
   </f7-page>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
 import { store, refrescar } from '@/js/store.js';
-import { estatusColor, etiquetaEstatus, formatFecha, siguienteAccion, horaLocal } from '@/js/pendientes.js';
+import {
+  estatusColor, etiquetaEstatus, formatFecha, horaLocal,
+  accionesDisponibles, motivoSinAcciones, puedeEditar, puedeEliminar,
+} from '@/js/pendientes.js';
 
-// Framework7 pasa f7route/f7router a los componentes de ruta.
 const props = defineProps({ f7route: Object, f7router: Object });
 const id = props.f7route.params.id;
 
@@ -111,11 +129,14 @@ const p = ref(null);
 const historial = ref([]);
 const checklist = ref([]);
 const nuevoItem = ref('');
+const eliminado = ref(false); // evita recargar un pendiente ya borrado
 
-const accion = computed(() => (p.value ? siguienteAccion(p.value.estatus) : null));
+const acciones = computed(() => accionesDisponibles(p.value, store.usuario));
 const hechos = computed(() => checklist.value.filter((i) => i.completado).length);
+const hoy = new Date().toISOString().slice(0, 10);
 
 async function cargar() {
+  if (eliminado.value) return;
   loading.value = true;
   error.value = '';
   try {
@@ -130,18 +151,93 @@ async function cargar() {
   }
 }
 
-async function cambiar(nuevo) {
+// Enruta cada acción a su comportamiento
+function ejecutar(a) {
+  if (a.tipo === 'editar') return editar();
+  if (a.tipo === 'reagendar') return abrirReagendar();
+  if (a.id === 'aprobar') return aprobar();
+  if (a.id === 'devolver') return devolver();
+  return patch({ estatus: a.estatus });
+}
+
+function editar() {
+  props.f7router.navigate(`/pendientes/${id}/editar/`);
+}
+
+async function patch(cambios) {
   guardando.value = true;
   try {
-    await api.pendientes.update(id, { estatus: nuevo, actor_id: store.usuario.id });
-    await cargar(); // trae el historial actualizado desde la BD
+    await api.pendientes.update(id, { ...cambios, actor_id: store.usuario.id });
+    // refrescar() dispara el watch de store.tick, que recarga esta página
+    // (historial + estatus) y también Inicio/Lista/Tablero. Una sola petición.
     refrescar();
-    f7.toast.create({ text: `Estatus: ${etiquetaEstatus(nuevo)}`, closeTimeout: 1800, position: 'center' }).open();
+    if (cambios.estatus) {
+      f7.toast.create({ text: `Estatus: ${etiquetaEstatus(cambios.estatus)}`, closeTimeout: 1800, position: 'center' }).open();
+    }
   } catch (e) {
     f7.dialog.alert(e.message || 'No se pudo actualizar.', 'Error');
   } finally {
     guardando.value = false;
   }
+}
+
+// Paso 3: el responsable propone otra fecha compromiso.
+function abrirReagendar() {
+  const actual = p.value.fecha_compromiso || hoy;
+  const dlg = f7.dialog.create({
+    title: 'Reagendar',
+    text: 'Elige la nueva fecha compromiso:',
+    content: `<div class="dialog-input-field input"><input type="date" class="dialog-input" value="${actual}" min="${hoy}"></div>`,
+    buttons: [
+      { text: 'Cancelar', color: 'gray' },
+      {
+        text: 'Guardar',
+        bold: true,
+        onClick: (dialog) => {
+          const nueva = dialog.$el.find('input.dialog-input').val();
+          if (!nueva) return;
+          patch({ estatus: 'reagendado', fecha_compromiso: nueva, detalle: `nueva fecha: ${nueva}` });
+        },
+      },
+    ],
+  });
+  dlg.open();
+}
+
+// Paso 6: quien delegó aprueba, con comentario opcional.
+function aprobar() {
+  f7.dialog.prompt('Comentario (opcional)', 'Aprobar pendiente', (comentario) => {
+    const cambios = { estatus: 'aprobado' };
+    if (comentario?.trim()) cambios.comentario_cierre = comentario.trim();
+    patch(cambios);
+  });
+}
+
+// Devolver a revisión: pide el motivo para que quede en el historial.
+function devolver() {
+  f7.dialog.prompt('¿Qué falta corregir?', 'Devolver a revisión', (motivo) => {
+    if (!motivo?.trim()) return;
+    patch({ estatus: 'en_progreso', detalle: `devuelto: ${motivo.trim()}` });
+  });
+}
+
+function eliminar() {
+  f7.dialog.confirm(
+    `Se eliminará «${p.value.titulo}» con su historial y checklist. Esta acción no se puede deshacer.`,
+    'Eliminar pendiente',
+    async () => {
+      try {
+        eliminado.value = true; // el watch ya no intentará recargarlo
+        await api.pendientes.remove(id);
+        f7.toast.create({ text: 'Pendiente eliminado', closeTimeout: 1800, position: 'center' }).open();
+        props.f7router.back();
+        refrescar();
+      } catch (e) {
+        eliminado.value = false;
+        f7.dialog.alert(e.message || 'No se pudo eliminar.', 'Error');
+      }
+    }
+  );
 }
 
 async function agregarItem() {
@@ -168,6 +264,9 @@ async function toggleItem(item, valor) {
 }
 
 onMounted(cargar);
+// Al volver de "Editar" (o si otra pantalla cambia datos) esta página sigue
+// montada en el stack: recargamos para no mostrar información vieja.
+watch(() => store.tick, cargar);
 </script>
 
 <style scoped>
@@ -176,11 +275,16 @@ onMounted(cargar);
 .det-desc { margin: 0 0 14px; opacity: 0.75; }
 .det-meta { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
 .det-meta i { font-size: 17px; margin-right: 8px; color: var(--inova-primary); vertical-align: -2px; }
+.det-creador { opacity: 0.65; font-size: 13px; }
+.acciones { display: flex; flex-direction: column; gap: 10px; }
+.sin-acciones {
+  border-radius: 16px; padding: 14px; display: flex; align-items: center; gap: 10px;
+  font-size: 14px; opacity: 0.8;
+}
+.sin-acciones i { font-size: 20px; color: var(--inova-primary); }
 .timeline-item-content.glass { border-radius: 14px; }
 .tachado { text-decoration: line-through; opacity: 0.5; }
-.check-progreso {
-  float: right; font-size: 13px; font-weight: 700; color: var(--inova-primary);
-}
+.check-progreso { float: right; font-size: 13px; font-weight: 700; color: var(--inova-primary); }
 .error-card { border-radius: 18px; padding: 16px; display: flex; gap: 12px; align-items: center; }
 .error-card i { font-size: 28px; color: var(--st-vencido); }
 .error-sub { font-size: 13px; opacity: 0.7; margin-top: 2px; }

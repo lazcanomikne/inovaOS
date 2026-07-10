@@ -49,7 +49,12 @@
         </li>
         <li v-if="!filtrados.length">
           <div class="item-content">
-            <div class="item-inner text-color-gray">Sin pendientes en este filtro.</div>
+            <div class="item-inner vacio">
+              <span class="text-color-gray">
+                {{ filtro === 'todos' ? 'Aún no hay pendientes.' : `Nada en «${etiquetaFiltro}».` }}
+              </span>
+              <a v-if="filtro !== 'todos'" class="link" @click="filtro = 'todos'">Ver todos</a>
+            </div>
           </div>
         </li>
       </ul>
@@ -60,32 +65,41 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { api } from '@/js/api.js';
-import { store } from '@/js/store.js';
+import { store, setFiltro } from '@/js/store.js';
 import { estatusColor, etiquetaEstatus, formatFecha, CERRADOS } from '@/js/pendientes.js';
 
 const props = defineProps({ f7router: Object });
 const loading = ref(true);
 const error = ref('');
 const items = ref([]);
-const filtro = ref('todos');
+// Fuente única: el filtro vive en el store, así Inicio puede fijarlo
+// (al tocar una tarjeta del semáforo) y la lista lo refleja al instante.
+const filtro = computed({
+  get: () => store.filtro,
+  set: (v) => setFiltro(v),
+});
 
+// Mismas claves que el semáforo de Inicio, para que al tocar una tarjeta
+// la lista muestre exactamente ese grupo.
 const filtros = [
   { key: 'todos', label: 'Todos' },
   { key: 'vencido', label: 'Vencidos' },
   { key: 'hoy', label: 'Vencen hoy' },
-  { key: 'activo', label: 'En curso' },
+  { key: 'manana', label: 'Vencen mañana' },
+  { key: 'tiempo', label: 'En tiempo' },
+  { key: 'espera', label: 'En espera' },
   { key: 'concluido', label: 'Concluidos' },
 ];
 
 function coincide(p, key) {
   if (key === 'todos') return true;
   if (key === 'concluido') return CERRADOS.includes(p.estatus);
-  if (key === 'activo') return !CERRADOS.includes(p.estatus);
   return estatusColor(p) === key;
 }
 
 const filtrados = computed(() => items.value.filter((p) => coincide(p, filtro.value)));
 const conteo = (key) => (key === 'todos' ? 0 : items.value.filter((p) => coincide(p, key)).length);
+const etiquetaFiltro = computed(() => filtros.find((f) => f.key === filtro.value)?.label ?? '');
 
 function abrir(id) { props.f7router.navigate(`/pendientes/${id}/`); }
 
@@ -125,6 +139,7 @@ watch(() => store.tick, cargar);
   background: rgba(0, 0, 0, 0.08);
 }
 .filtro-chip.active .chip-count { background: rgba(255, 255, 255, 0.25); }
+.vacio { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .item-title-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .error-card { border-radius: 18px; padding: 16px; display: flex; gap: 12px; align-items: center; }
 .error-card i { font-size: 28px; color: var(--st-vencido); }

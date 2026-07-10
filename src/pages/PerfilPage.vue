@@ -6,15 +6,17 @@
     </f7-navbar>
 
     <div class="block">
-      <div class="card glass-strong perfil-card">
+      <div class="card glass-strong perfil-card" @click="cambiarUsuario">
         <div class="card-content card-content-padding perfil-head">
           <div class="perfil-avatar">{{ iniciales }}</div>
-          <div>
+          <div class="perfil-datos">
             <div class="perfil-nombre">{{ usuario.nombre }}</div>
-            <div class="perfil-rol">{{ usuario.rol }}</div>
+            <div class="perfil-rol">{{ etiquetaRol }}</div>
           </div>
+          <i class="f7-icons perfil-chevron">chevron_right</i>
         </div>
       </div>
+      <div class="hint-usuario">Toca para cambiar de usuario (aún no hay inicio de sesión).</div>
     </div>
 
     <div class="list glass-list no-hairlines">
@@ -55,12 +57,47 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { f7 } from 'framework7-vue';
-import { store } from '@/js/store.js';
+import { api } from '@/js/api.js';
+import { store, setUsuarios, setUsuario, refrescar } from '@/js/store.js';
 
 const usuario = computed(() => store.usuario);
 const notif = ref(true);
+
+const ROLES = { direccion: 'Dirección General', jefe: 'Jefe directo', colaborador: 'Colaborador' };
+const etiquetaRol = computed(() => ROLES[usuario.value.rol] ?? usuario.value.rol);
+
+async function cargarUsuarios() {
+  if (store.usuarios.length) return;
+  try { setUsuarios(await api.usuarios.list()); } catch { /* sin red: se queda el actual */ }
+}
+
+async function cambiarUsuario() {
+  await cargarUsuarios();
+  if (!store.usuarios.length) {
+    f7.dialog.alert('No se pudo cargar la lista de usuarios.', 'Usuario');
+    return;
+  }
+  f7.dialog.create({
+    title: 'Ver la app como…',
+    text: 'Las acciones disponibles cambian según el rol.',
+    buttons: [
+      ...store.usuarios.map((u) => ({
+        text: `${u.nombre} — ${ROLES[u.rol] ?? u.rol}`,
+        onClick: () => {
+          setUsuario(u);
+          refrescar(); // las pantallas recalculan permisos
+          f7.toast.create({ text: `Ahora eres ${u.nombre}`, closeTimeout: 1800, position: 'center' }).open();
+        },
+      })),
+      { text: 'Cancelar', color: 'gray' },
+    ],
+    verticalButtons: true,
+  }).open();
+}
+
+onMounted(cargarUsuarios);
 const version = __APP_VERSION__ || '0.1.0';
 const buildId = __BUILD_ID__ || '—';
 
@@ -106,7 +143,11 @@ async function buscarActualizacion() {
 </script>
 
 <style scoped>
+.perfil-card { cursor: pointer; }
 .perfil-head { display: flex; align-items: center; gap: 16px; }
+.perfil-datos { flex: 1; min-width: 0; }
+.perfil-chevron { font-size: 20px; opacity: 0.35; }
+.hint-usuario { text-align: center; font-size: 12px; opacity: 0.5; margin-top: 8px; }
 .perfil-avatar {
   width: 64px; height: 64px; border-radius: 50%;
   background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));

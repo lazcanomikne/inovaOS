@@ -22,7 +22,7 @@
     <template v-else>
       <div class="block-title">Mis pendientes</div>
       <div class="semaforo-grid">
-        <div v-for="s in semaforo" :key="s.key" class="glass semaforo-card" @click="irAPendientes">
+        <div v-for="s in semaforo" :key="s.key" class="glass semaforo-card" @click="verFiltrados(s.key)">
           <span class="st-dot" :class="'st-' + s.key"></span>
           <div class="semaforo-num">{{ loading ? '·' : s.total }}</div>
           <div class="semaforo-label">{{ s.label }}</div>
@@ -75,7 +75,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
-import { store } from '@/js/store.js';
+import { store, setFiltro } from '@/js/store.js';
 import { estatusColor, formatFecha } from '@/js/pendientes.js';
 
 // Framework7 pasa f7router a los componentes de ruta.
@@ -110,7 +110,11 @@ async function cargar() {
 }
 
 function abrir(id) { props.f7router.navigate(`/pendientes/${id}/`); }
-function irAPendientes() { f7.tab.show('#view-pendientes'); }
+// Cada tarjeta del semáforo lleva a la lista ya filtrada por ese estado.
+function verFiltrados(key) {
+  setFiltro(key);
+  f7.tab.show('#view-pendientes');
+}
 function irCaptura() { f7.tab.show('#view-captura'); }
 function irTablero() { f7.tab.show('#view-tablero'); }
 function onRefresh(done) { cargar().finally(done); }

@@ -1,4 +1,4 @@
-// Helpers de dominio para pendientes (semáforo, fechas, etiquetas).
+// Helpers de dominio para pendientes (semáforo, fechas, etiquetas, permisos y flujo).
 
 export const ETIQUETAS = {
   capturado: 'Capturado',
@@ -56,16 +56,84 @@ export function horaLocal(createdAt) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// Siguiente acción del flujo (pasos 3-6 del proceso)
-export function siguienteAccion(estatus) {
-  return {
-    capturado: null,
-    delegado: { estatus: 'aceptado', texto: 'Aceptar', color: '' },
-    aceptado: { estatus: 'en_progreso', texto: 'Iniciar', color: '' },
-    en_progreso: { estatus: 'concluido', texto: 'Marcar como concluido', color: '' },
-    en_espera: { estatus: 'en_progreso', texto: 'Retomar', color: '' },
-    concluido: { estatus: 'aprobado', texto: 'Aprobar', color: 'green' },
-    aprobado: null,
-    reagendado: { estatus: 'aceptado', texto: 'Aceptar', color: '' },
-  }[estatus];
+/* ------------------------- Permisos ------------------------- */
+
+export const esDireccion = (u) => u?.rol === 'direccion';
+export const esCreador = (p, u) => !!u && p.creado_por === u.id;
+export const esResponsable = (p, u) => !!u && p.responsable_id === u.id;
+
+// Dirección puede todo; si no, sólo su rol en el pendiente.
+const puedeComoResponsable = (p, u) => esResponsable(p, u) || esDireccion(u);
+const puedeComoCreador = (p, u) => esCreador(p, u) || esDireccion(u);
+
+// El creador (o dirección) edita y elimina. No se edita lo ya aprobado.
+export const puedeEditar = (p, u) => puedeComoCreador(p, u) && p.estatus !== 'aprobado';
+export const puedeEliminar = (p, u) => puedeComoCreador(p, u);
+
+/* ------------------------- Flujo (pasos 2-6) -------------------------
+   Devuelve las acciones disponibles para ESTE usuario en ESTE estatus.
+   tipo: 'estatus' aplica un cambio directo; 'reagendar' abre el selector de fecha.
+--------------------------------------------------------------------- */
+export function accionesDisponibles(p, u) {
+  if (!p) return [];
+  const acciones = [];
+  const comoResp = puedeComoResponsable(p, u);
+  const comoCre = puedeComoCreador(p, u);
+
+  switch (p.estatus) {
+    case 'capturado':
+      // Sin responsable todavía: hay que delegarlo (se hace editando).
+      if (comoCre) acciones.push({ id: 'editar', texto: 'Asignar responsable', tipo: 'editar', fill: true });
+      break;
+
+    case 'delegado':
+    case 'reagendado':
+      // Paso 3: el responsable acepta o propone otra fecha.
+      if (comoResp) {
+        acciones.push({ id: 'aceptar', texto: 'Aceptar', tipo: 'estatus', estatus: 'aceptado', fill: true });
+        acciones.push({ id: 'reagendar', texto: 'Reagendar', tipo: 'reagendar' });
+      }
+      break;
+
+    case 'aceptado':
+      // Paso 4: empieza a trabajar.
+      if (comoResp) acciones.push({ id: 'iniciar', texto: 'Iniciar', tipo: 'estatus', estatus: 'en_progreso', fill: true });
+      break;
+
+    case 'en_progreso':
+      // Paso 5: concluye (la evidencia llega después) o queda esperando a un tercero.
+      if (comoResp) {
+        acciones.push({ id: 'concluir', texto: 'Marcar como concluido', tipo: 'estatus', estatus: 'concluido', fill: true });
+        acciones.push({ id: 'espera', texto: 'Poner en espera', tipo: 'estatus', estatus: 'en_espera' });
+      }
+      break;
+
+    case 'en_espera':
+      if (comoResp) acciones.push({ id: 'retomar', texto: 'Retomar', tipo: 'estatus', estatus: 'en_progreso', fill: true });
+      break;
+
+    case 'concluido':
+      // Paso 6: revisión. Sólo quien lo delegó aprueba o devuelve.
+      if (comoCre) {
+        acciones.push({ id: 'aprobar', texto: 'Aprobar', tipo: 'estatus', estatus: 'aprobado', color: 'green', fill: true });
+        acciones.push({ id: 'devolver', texto: 'Devolver a revisión', tipo: 'estatus', estatus: 'en_progreso', color: 'red' });
+      }
+      break;
+
+    case 'aprobado':
+    default:
+      break;
+  }
+  return acciones;
+}
+
+// Texto explicativo cuando el usuario no tiene acciones (para no dejar la pantalla muda).
+export function motivoSinAcciones(p, u) {
+  if (!p) return '';
+  if (p.estatus === 'aprobado') return 'Este pendiente está cerrado y aprobado.';
+  if (p.estatus === 'concluido') return 'Esperando la revisión de quien lo delegó.';
+  if (['delegado', 'reagendado', 'aceptado', 'en_progreso', 'en_espera'].includes(p.estatus)) {
+    return `Esperando a ${p.responsable_nombre || 'el responsable'}.`;
+  }
+  return '';
 }
