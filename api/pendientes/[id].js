@@ -1,4 +1,4 @@
-import { db, sendJson, sendError, readBody } from '../_db.js';
+import { db, sendJson, sendError, readBody, nombreUsuario } from '../_db.js';
 
 function etiqueta(e) {
   return {
@@ -21,12 +21,17 @@ export default async function handler(req, res) {
     });
     if (!rows.length) return sendError(res, 'No encontrado', 404);
 
+    // created_at viene en UTC ('YYYY-MM-DD HH:MM:SS'); el cliente lo pasa a hora local.
     const { rows: historial } = await client.execute({
-      sql: `SELECT strftime('%H:%M', created_at) AS hora, evento, detalle
+      sql: `SELECT created_at, evento, detalle
             FROM historial WHERE pendiente_id = ? ORDER BY created_at ASC`,
       args: [id],
     });
-    return sendJson(res, { pendiente: rows[0], historial });
+    const { rows: checklist } = await client.execute({
+      sql: 'SELECT * FROM checklist WHERE pendiente_id = ? ORDER BY orden, id',
+      args: [id],
+    });
+    return sendJson(res, { pendiente: rows[0], historial, checklist });
   }
 
   if (req.method === 'PATCH' || req.method === 'PUT') {
@@ -43,9 +48,10 @@ export default async function handler(req, res) {
     await client.execute({ sql: `UPDATE pendientes SET ${campos.join(', ')} WHERE id = ?`, args });
 
     if (b.estatus) {
+      const actor = await nombreUsuario(client, b.actor_id);
       await client.execute({
         sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, ?, ?, ?)`,
-        args: [id, etiqueta(b.estatus), b.detalle ?? null, b.actor_id ?? null],
+        args: [id, etiqueta(b.estatus), b.detalle ?? (actor ? `por ${actor}` : null), b.actor_id ?? null],
       });
     }
     const { rows } = await client.execute({ sql: 'SELECT * FROM pendientes WHERE id = ?', args: [id] });

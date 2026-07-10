@@ -6,6 +6,14 @@
 
     <div v-if="loading" class="block text-align-center"><f7-preloader /></div>
 
+    <div v-else-if="error" class="block">
+      <div class="glass error-card">
+        <i class="f7-icons">exclamationmark_triangle_fill</i>
+        <div><strong>No se pudo cargar</strong><div class="error-sub">{{ error }}</div></div>
+      </div>
+      <f7-button class="glass-btn margin-top" @click="cargar">Reintentar</f7-button>
+    </div>
+
     <template v-else-if="p">
       <div class="block">
         <div class="card detalle-card">
@@ -26,76 +34,136 @@
         </div>
       </div>
 
-      <!-- Acciones según estatus -->
-      <div class="block">
-        <f7-button v-if="p.estatus==='delegado'" large fill @click="cambiar('aceptado')">Aceptar</f7-button>
-        <f7-button v-if="p.estatus==='aceptado'" large fill @click="cambiar('en_progreso')">Iniciar</f7-button>
-        <f7-button v-if="p.estatus==='en_progreso'" large fill @click="cambiar('concluido')">Concluir con evidencia</f7-button>
-        <f7-button v-if="p.estatus==='concluido'" large fill color="green" @click="cambiar('aprobado')">Aprobar</f7-button>
+      <!-- Acción del flujo (pasos 3-6) -->
+      <div v-if="accion" class="block">
+        <f7-button large fill :color="accion.color || undefined" @click="cambiar(accion.estatus)" :disabled="guardando">
+          {{ guardando ? 'Guardando…' : accion.texto }}
+        </f7-button>
+      </div>
+
+      <!-- Checklist (paso 4) -->
+      <div class="block-title">
+        Checklist
+        <span v-if="checklist.length" class="check-progreso">{{ hechos }}/{{ checklist.length }}</span>
+      </div>
+      <div class="list glass-list no-hairlines">
+        <ul>
+          <li v-for="item in checklist" :key="item.id">
+            <label class="item-checkbox item-content">
+              <input
+                type="checkbox"
+                :checked="!!item.completado"
+                @change="toggleItem(item, $event.target.checked)"
+              />
+              <i class="icon icon-checkbox"></i>
+              <div class="item-inner">
+                <div class="item-title" :class="{ tachado: item.completado }">{{ item.texto }}</div>
+              </div>
+            </label>
+          </li>
+          <li class="item-content item-input">
+            <div class="item-inner">
+              <div class="item-input-wrap">
+                <input
+                  type="text"
+                  v-model="nuevoItem"
+                  placeholder="Añadir paso…"
+                  @keyup.enter="agregarItem"
+                />
+              </div>
+            </div>
+          </li>
+        </ul>
       </div>
 
       <!-- Historial / trazabilidad (paso 8) -->
       <div class="block-title">Historial</div>
       <div class="timeline">
         <div v-for="(h, i) in historial" :key="i" class="timeline-item">
-          <div class="timeline-item-date">{{ h.hora }}</div>
+          <div class="timeline-item-date">{{ horaLocal(h.created_at) }}</div>
           <div class="timeline-item-divider"></div>
           <div class="timeline-item-content glass">
             <div class="timeline-item-title">{{ h.evento }}</div>
-            <div class="timeline-item-subtitle">{{ h.detalle }}</div>
+            <div v-if="h.detalle" class="timeline-item-subtitle">{{ h.detalle }}</div>
           </div>
         </div>
+        <div v-if="!historial.length" class="block text-color-gray">Sin eventos aún.</div>
       </div>
     </template>
   </f7-page>
 </template>
 
 <script setup>
-import { ref, onMounted, getCurrentInstance } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
+import { store, refrescar } from '@/js/store.js';
+import { estatusColor, etiquetaEstatus, formatFecha, siguienteAccion, horaLocal } from '@/js/pendientes.js';
 
-const { proxy } = getCurrentInstance();
-const $f7 = proxy.$f7;
-const id = proxy.$f7route.params.id;
+// Framework7 pasa f7route/f7router a los componentes de ruta.
+const props = defineProps({ f7route: Object, f7router: Object });
+const id = props.f7route.params.id;
 
 const loading = ref(true);
+const guardando = ref(false);
+const error = ref('');
 const p = ref(null);
 const historial = ref([]);
+const checklist = ref([]);
+const nuevoItem = ref('');
 
-function diasRestantes(f){ if(!f) return 999; const h=new Date();h.setHours(0,0,0,0); const d=new Date(f);d.setHours(0,0,0,0); return Math.round((d-h)/86400000); }
-function estatusColor(p){ if(['concluido','aprobado'].includes(p.estatus)) return 'concluido'; const d=diasRestantes(p.fecha_compromiso); if(d<0)return'vencido'; if(d===0)return'hoy'; if(d===1)return'manana'; return'tiempo'; }
-function etiquetaEstatus(e){ return {capturado:'Capturado',delegado:'Delegado',aceptado:'Aceptado',en_progreso:'En progreso',en_espera:'En espera',concluido:'Concluido',aprobado:'Aprobado',reagendado:'Reagendado'}[e]||e; }
-function formatFecha(f){ const d=diasRestantes(f); if(d===0)return'hoy'; if(d===1)return'mañana'; if(d<0)return`hace ${-d} d`; if(d===999)return'—'; return`en ${d} d`; }
+const accion = computed(() => (p.value ? siguienteAccion(p.value.estatus) : null));
+const hechos = computed(() => checklist.value.filter((i) => i.completado).length);
 
 async function cargar() {
   loading.value = true;
+  error.value = '';
   try {
     const data = await api.pendientes.get(id);
-    p.value = data.pendiente || data;
-    historial.value = data.historial || demoHist;
+    p.value = data.pendiente;
+    historial.value = data.historial ?? [];
+    checklist.value = data.checklist ?? [];
   } catch (e) {
-    p.value = { id, titulo:'Cotizar Mahle Audio', descripcion:'Cotización para viernes con proveedor.', responsable_nombre:'Carlos Narváez', prioridad:'Alta', area:'Ventas', fecha_compromiso:new Date(Date.now()+86400000).toISOString(), estatus:'en_progreso' };
-    historial.value = demoHist;
+    error.value = e.message || 'Error de red';
   } finally {
     loading.value = false;
   }
 }
 
-const demoHist = [
-  { hora:'08:35', evento:'Creado', detalle:'por Carolina G.' },
-  { hora:'08:36', evento:'Delegado', detalle:'a Carlos Narváez' },
-  { hora:'08:37', evento:'Aceptado', detalle:'Carlos aceptó' },
-  { hora:'10:15', evento:'Solicitó información', detalle:'al proveedor' },
-];
-
 async function cambiar(nuevo) {
+  guardando.value = true;
   try {
-    await api.pendientes.update(id, { estatus: nuevo });
-    p.value.estatus = nuevo;
-    $f7.toast.create({ text: `Estatus: ${etiquetaEstatus(nuevo)}`, closeTimeout: 1800, position:'center' }).open();
+    await api.pendientes.update(id, { estatus: nuevo, actor_id: store.usuario.id });
+    await cargar(); // trae el historial actualizado desde la BD
+    refrescar();
+    f7.toast.create({ text: `Estatus: ${etiquetaEstatus(nuevo)}`, closeTimeout: 1800, position: 'center' }).open();
   } catch (e) {
-    p.value.estatus = nuevo; // optimista en demo
-    $f7.toast.create({ text: `Estatus: ${etiquetaEstatus(nuevo)} (demo)`, closeTimeout: 1800, position:'center' }).open();
+    f7.dialog.alert(e.message || 'No se pudo actualizar.', 'Error');
+  } finally {
+    guardando.value = false;
+  }
+}
+
+async function agregarItem() {
+  const texto = nuevoItem.value.trim();
+  if (!texto) return;
+  nuevoItem.value = '';
+  try {
+    const item = await api.checklist.create({ pendiente_id: Number(id), texto, orden: checklist.value.length });
+    checklist.value.push(item);
+  } catch (e) {
+    f7.toast.create({ text: 'No se pudo añadir', closeTimeout: 1800, position: 'center' }).open();
+  }
+}
+
+async function toggleItem(item, valor) {
+  const previo = item.completado;
+  item.completado = valor ? 1 : 0; // respuesta inmediata en UI
+  try {
+    await api.checklist.toggle(item.id, valor);
+  } catch (e) {
+    item.completado = previo; // revierte si falla
+    f7.toast.create({ text: 'No se pudo guardar', closeTimeout: 1800, position: 'center' }).open();
   }
 }
 
@@ -109,4 +177,11 @@ onMounted(cargar);
 .det-meta { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
 .det-meta i { font-size: 17px; margin-right: 8px; color: var(--inova-primary); vertical-align: -2px; }
 .timeline-item-content.glass { border-radius: 14px; }
+.tachado { text-decoration: line-through; opacity: 0.5; }
+.check-progreso {
+  float: right; font-size: 13px; font-weight: 700; color: var(--inova-primary);
+}
+.error-card { border-radius: 18px; padding: 16px; display: flex; gap: 12px; align-items: center; }
+.error-card i { font-size: 28px; color: var(--st-vencido); }
+.error-sub { font-size: 13px; opacity: 0.7; margin-top: 2px; }
 </style>

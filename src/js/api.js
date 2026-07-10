@@ -43,4 +43,10 @@ export const api = {
   tablero: {
     resumen: () => request('/tablero'),
   },
+  checklist: {
+    list: (pendienteId) => request(`/checklist?pendiente_id=${pendienteId}`),
+    create: (body) => request('/checklist', { method: 'POST', body }),
+    toggle: (itemId, completado) => request(`/checklist/${itemId}`, { method: 'PATCH', body: { completado } }),
+    remove: (itemId) => request(`/checklist/${itemId}`, { method: 'DELETE' }),
+  },
 };

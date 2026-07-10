@@ -5,20 +5,20 @@
       <f7-nav-title-large>Capturar</f7-nav-title-large>
     </f7-navbar>
 
-    <!-- Métodos de captura (paso 1 del diagrama) -->
+    <!-- Métodos de captura (paso 1) -->
     <div class="captura-metodos">
-      <div class="glass metodo-card" :class="{ active: metodo==='manual' }" @click="metodo='manual'">
+      <div class="glass metodo-card" :class="{ active: metodo === 'manual' }" @click="metodo = 'manual'">
         <i class="f7-icons">pencil</i><span>Manual</span>
       </div>
-      <div class="glass metodo-card" :class="{ active: metodo==='voz' }" @click="metodo='voz'">
+      <div class="glass metodo-card" :class="{ active: metodo === 'voz' }" @click="metodo = 'voz'">
         <i class="f7-icons">mic_fill</i><span>Voz</span>
       </div>
-      <div class="glass metodo-card" :class="{ active: metodo==='correo' }" @click="metodo='correo'">
+      <div class="glass metodo-card" :class="{ active: metodo === 'correo' }" @click="metodo = 'correo'">
         <i class="f7-icons">envelope_fill</i><span>Correo</span>
       </div>
     </div>
 
-    <!-- Formulario de delegación (pasos 1-2) -->
+    <!-- Delegación (paso 2) -->
     <div class="list glass-list no-hairlines-md form-list">
       <ul>
         <li class="item-content item-input">
@@ -38,11 +38,11 @@
           </div>
         </li>
         <li>
-          <a class="item-link smart-select" @click="pickResponsable">
+          <a class="item-link" @click="pickResponsable">
             <div class="item-content">
               <div class="item-inner">
                 <div class="item-title">Responsable</div>
-                <div class="item-after">{{ form.responsable_nombre || 'Seleccionar' }}</div>
+                <div class="item-after">{{ responsableNombre || 'Seleccionar' }}</div>
               </div>
             </div>
           </a>
@@ -51,7 +51,7 @@
           <div class="item-inner">
             <div class="item-title item-label">Fecha compromiso</div>
             <div class="item-input-wrap">
-              <input type="date" v-model="form.fecha_compromiso" />
+              <input type="date" v-model="form.fecha_compromiso" :min="hoy" />
             </div>
           </div>
         </li>
@@ -61,8 +61,7 @@
               <div class="item-inner">
                 <div class="item-title">Prioridad</div>
                 <div class="item-after">
-                  <span class="st-dot" :class="prioridadClase"></span>
-                  {{ form.prioridad }}
+                  <span class="st-dot" :class="prioridadClase"></span> {{ form.prioridad }}
                 </div>
               </div>
             </div>
@@ -80,91 +79,119 @@
     </div>
 
     <div class="block">
-      <f7-button large fill @click="delegar" :disabled="!form.titulo || saving">
-        {{ saving ? 'Delegando…' : 'Delegar' }}
+      <f7-button large fill @click="delegar" :disabled="!form.titulo.trim() || saving">
+        {{ saving ? 'Delegando…' : form.responsable_id ? 'Delegar' : 'Guardar sin asignar' }}
       </f7-button>
     </div>
   </f7-page>
 </template>
 
 <script setup>
-import { ref, computed, getCurrentInstance } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
-
-const { proxy } = getCurrentInstance();
-const $f7 = proxy.$f7;
+import { store, setUsuarios, refrescar } from '@/js/store.js';
 
 const metodo = ref('manual');
 const saving = ref(false);
+const hoy = new Date().toISOString().slice(0, 10);
+
 const form = ref({
   titulo: '',
   descripcion: '',
   responsable_id: null,
-  responsable_nombre: '',
   fecha_compromiso: '',
   prioridad: 'Alta',
   area: '',
 });
 
-const prioridadClase = computed(() => {
-  return { Alta: 'st-vencido', Media: 'st-hoy', Baja: 'st-tiempo' }[form.value.prioridad] || 'st-tiempo';
+const responsableNombre = computed(() => {
+  const u = store.usuarios.find((x) => x.id === form.value.responsable_id);
+  return u ? u.nombre : '';
 });
 
-function pickResponsable() {
-  $f7.dialog.create({
-    title: 'Responsable',
-    buttons: [
-      { text: 'Carlos Narváez', onClick: () => set('Carlos Narváez', 2) },
-      { text: 'Ana López', onClick: () => set('Ana López', 3) },
-      { text: 'Cancelar', color: 'gray' },
-    ],
-    verticalButtons: true,
-  }).open();
-  function set(nombre, id) {
-    form.value.responsable_nombre = nombre;
-    form.value.responsable_id = id;
+const prioridadClase = computed(
+  () => ({ Alta: 'st-vencido', Media: 'st-hoy', Baja: 'st-tiempo' }[form.value.prioridad])
+);
+
+async function cargarUsuarios() {
+  if (store.usuarios.length) return;
+  try {
+    setUsuarios(await api.usuarios.list());
+  } catch (e) {
+    f7.toast.create({ text: 'No se pudo cargar usuarios', closeTimeout: 2000, position: 'center' }).open();
   }
 }
 
+async function pickResponsable() {
+  // Si aún no llegaron, los esperamos antes de abrir (no dejamos el toque sin efecto).
+  await cargarUsuarios();
+  if (!store.usuarios.length) {
+    f7.dialog.alert('No hay usuarios disponibles.', 'Responsable');
+    return;
+  }
+  f7.dialog
+    .create({
+      title: 'Responsable',
+      buttons: [
+        { text: 'Sin asignar', onClick: () => (form.value.responsable_id = null) },
+        ...store.usuarios.map((u) => ({
+          text: u.nombre,
+          onClick: () => (form.value.responsable_id = u.id),
+        })),
+        { text: 'Cancelar', color: 'gray' },
+      ],
+      verticalButtons: true,
+    })
+    .open();
+}
+
 function pickPrioridad() {
-  $f7.dialog.create({
-    title: 'Prioridad',
-    buttons: [
-      { text: 'Alta', onClick: () => (form.value.prioridad = 'Alta') },
-      { text: 'Media', onClick: () => (form.value.prioridad = 'Media') },
-      { text: 'Baja', onClick: () => (form.value.prioridad = 'Baja') },
-      { text: 'Cancelar', color: 'gray' },
-    ],
-    verticalButtons: true,
-  }).open();
+  f7.dialog
+    .create({
+      title: 'Prioridad',
+      buttons: [
+        ...['Alta', 'Media', 'Baja'].map((p) => ({ text: p, onClick: () => (form.value.prioridad = p) })),
+        { text: 'Cancelar', color: 'gray' },
+      ],
+      verticalButtons: true,
+    })
+    .open();
 }
 
 async function delegar() {
   saving.value = true;
   try {
     await api.pendientes.create({
-      titulo: form.value.titulo,
-      descripcion: form.value.descripcion,
+      titulo: form.value.titulo.trim(),
+      descripcion: form.value.descripcion.trim() || null,
       responsable_id: form.value.responsable_id,
       fecha_compromiso: form.value.fecha_compromiso || null,
       prioridad: form.value.prioridad,
-      area: form.value.area,
+      area: form.value.area.trim() || null,
       origen: metodo.value,
+      creado_por: store.usuario.id,
     });
-    $f7.toast.create({ text: 'Pendiente delegado ✓', closeTimeout: 2000, position: 'center' }).open();
+    f7.toast.create({ text: 'Pendiente guardado ✓', closeTimeout: 2000, position: 'center' }).open();
     reset();
-    $f7.tab.show('#view-pendientes');
+    refrescar(); // avisa a Home/Pendientes/Tablero que recarguen
+    f7.tab.show('#view-pendientes');
   } catch (e) {
-    $f7.dialog.alert(e.message || 'No se pudo guardar. Revisa el API/D1.', 'Error');
+    f7.dialog.alert(e.message || 'No se pudo guardar.', 'Error');
   } finally {
     saving.value = false;
   }
 }
 
 function reset() {
-  form.value = { titulo: '', descripcion: '', responsable_id: null, responsable_nombre: '', fecha_compromiso: '', prioridad: 'Alta', area: '' };
+  form.value = {
+    titulo: '', descripcion: '', responsable_id: null,
+    fecha_compromiso: '', prioridad: 'Alta', area: '',
+  };
   metodo.value = 'manual';
 }
+
+onMounted(cargarUsuarios);
 </script>
 
 <style scoped>

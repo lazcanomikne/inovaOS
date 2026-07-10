@@ -5,9 +5,6 @@
       <f7-nav-title-large>Pendientes</f7-nav-title-large>
     </f7-navbar>
 
-    <f7-ptr-preloader slot="fixed" />
-
-    <!-- Filtros por estatus -->
     <div class="filtros-scroll">
       <div
         v-for="f in filtros"
@@ -17,12 +14,19 @@
         @click="filtro = f.key"
       >
         {{ f.label }}
+        <span v-if="conteo(f.key)" class="chip-count">{{ conteo(f.key) }}</span>
       </div>
     </div>
 
-    <div v-if="loading" class="block text-align-center">
-      <f7-preloader />
+    <div v-if="error" class="block">
+      <div class="glass error-card">
+        <i class="f7-icons">exclamationmark_triangle_fill</i>
+        <div><strong>No se pudo conectar</strong><div class="error-sub">{{ error }}</div></div>
+      </div>
+      <f7-button class="glass-btn margin-top" @click="cargar">Reintentar</f7-button>
     </div>
+
+    <div v-else-if="loading" class="block text-align-center"><f7-preloader /></div>
 
     <div v-else class="list glass-list media-list no-hairlines">
       <ul>
@@ -36,26 +40,32 @@
                 <div class="item-title">{{ p.titulo }}</div>
                 <div class="item-after badge-glass">{{ p.prioridad }}</div>
               </div>
-              <div class="item-subtitle">{{ p.responsable_nombre || 'Sin asignar' }} · {{ etiquetaEstatus(p.estatus) }}</div>
+              <div class="item-subtitle">
+                {{ p.responsable_nombre || 'Sin asignar' }} · {{ etiquetaEstatus(p.estatus) }}
+              </div>
               <div class="item-text">Vence {{ formatFecha(p.fecha_compromiso) }}</div>
             </div>
           </a>
         </li>
         <li v-if="!filtrados.length">
-          <div class="item-content"><div class="item-inner text-color-gray">Sin pendientes en este filtro.</div></div>
+          <div class="item-content">
+            <div class="item-inner text-color-gray">Sin pendientes en este filtro.</div>
+          </div>
         </li>
       </ul>
     </div>
-
   </f7-page>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, getCurrentInstance } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { api } from '@/js/api.js';
+import { store } from '@/js/store.js';
+import { estatusColor, etiquetaEstatus, formatFecha, CERRADOS } from '@/js/pendientes.js';
 
-const { proxy } = getCurrentInstance();
+const props = defineProps({ f7router: Object });
 const loading = ref(true);
+const error = ref('');
 const items = ref([]);
 const filtro = ref('todos');
 
@@ -67,64 +77,33 @@ const filtros = [
   { key: 'concluido', label: 'Concluidos' },
 ];
 
-const filtrados = computed(() => {
-  if (filtro.value === 'todos') return items.value;
-  return items.value.filter((p) => {
-    const c = estatusColor(p);
-    if (filtro.value === 'concluido') return ['concluido', 'aprobado'].includes(p.estatus);
-    if (filtro.value === 'activo') return !['concluido', 'aprobado'].includes(p.estatus);
-    return c === filtro.value;
-  });
-});
+function coincide(p, key) {
+  if (key === 'todos') return true;
+  if (key === 'concluido') return CERRADOS.includes(p.estatus);
+  if (key === 'activo') return !CERRADOS.includes(p.estatus);
+  return estatusColor(p) === key;
+}
 
-function diasRestantes(fecha) {
-  if (!fecha) return 999;
-  const hoy = new Date(); hoy.setHours(0,0,0,0);
-  const f = new Date(fecha); f.setHours(0,0,0,0);
-  return Math.round((f - hoy) / 86400000);
-}
-function estatusColor(p) {
-  if (['concluido','aprobado'].includes(p.estatus)) return 'concluido';
-  if (p.estatus === 'en_espera') return 'espera';
-  const d = diasRestantes(p.fecha_compromiso);
-  if (d < 0) return 'vencido';
-  if (d === 0) return 'hoy';
-  if (d === 1) return 'manana';
-  return 'tiempo';
-}
-function etiquetaEstatus(e) {
-  return { capturado:'Capturado', delegado:'Delegado', aceptado:'Aceptado', en_progreso:'En progreso', en_espera:'En espera', concluido:'Concluido', aprobado:'Aprobado', reagendado:'Reagendado' }[e] || e;
-}
-function formatFecha(fecha) {
-  const d = diasRestantes(fecha);
-  if (d === 0) return 'hoy';
-  if (d === 1) return 'mañana';
-  if (d < 0) return `hace ${-d} d`;
-  if (d === 999) return '—';
-  return `en ${d} d`;
-}
-function abrir(id) { proxy.$f7router.navigate(`/pendientes/${id}/`); }
+const filtrados = computed(() => items.value.filter((p) => coincide(p, filtro.value)));
+const conteo = (key) => (key === 'todos' ? 0 : items.value.filter((p) => coincide(p, key)).length);
+
+function abrir(id) { props.f7router.navigate(`/pendientes/${id}/`); }
 
 async function cargar() {
   loading.value = true;
+  error.value = '';
   try {
     items.value = await api.pendientes.list();
   } catch (e) {
-    items.value = demo;
+    error.value = e.message || 'Error de red';
   } finally {
     loading.value = false;
   }
 }
 function onRefresh(done) { cargar().finally(done); }
 
-const demo = [
-  { id:'demo1', titulo:'Cotizar Mahle Audio', responsable_nombre:'Carlos Narváez', prioridad:'Alta', fecha_compromiso:new Date(Date.now()+86400000).toISOString(), estatus:'en_progreso' },
-  { id:'demo2', titulo:'Enviar propuesta cliente Norte', responsable_nombre:'Ana López', prioridad:'Media', fecha_compromiso:new Date().toISOString(), estatus:'aceptado' },
-  { id:'demo3', titulo:'Revisar contrato proveedor', responsable_nombre:'Carlos Narváez', prioridad:'Alta', fecha_compromiso:new Date(Date.now()-86400000).toISOString(), estatus:'delegado' },
-  { id:'demo4', titulo:'Cierre mensual de ventas', responsable_nombre:'Carolina G.', prioridad:'Baja', fecha_compromiso:new Date(Date.now()-2*86400000).toISOString(), estatus:'aprobado' },
-];
-
 onMounted(cargar);
+watch(() => store.tick, cargar);
 </script>
 
 <style scoped>
@@ -134,12 +113,20 @@ onMounted(cargar);
 }
 .filtros-scroll::-webkit-scrollbar { display: none; }
 .filtro-chip {
-  padding: 8px 16px; border-radius: 999px; font-size: 14px; font-weight: 600;
-  white-space: nowrap; cursor: pointer;
+  padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 600;
+  white-space: nowrap; cursor: pointer; display: flex; align-items: center; gap: 6px;
 }
 .filtro-chip.active {
   background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
   color: #fff; border-color: transparent;
 }
+.chip-count {
+  font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+}
+.filtro-chip.active .chip-count { background: rgba(255, 255, 255, 0.25); }
 .item-title-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.error-card { border-radius: 18px; padding: 16px; display: flex; gap: 12px; align-items: center; }
+.error-card i { font-size: 28px; color: var(--st-vencido); }
+.error-sub { font-size: 13px; opacity: 0.7; margin-top: 2px; }
 </style>

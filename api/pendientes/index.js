@@ -1,4 +1,4 @@
-import { db, sendJson, sendError, readBody } from '../_db.js';
+import { db, sendJson, sendError, readBody, nombreUsuario } from '../_db.js';
 
 // /api/pendientes  → GET lista · POST crear/delegar
 export default async function handler(req, res) {
@@ -42,14 +42,16 @@ export default async function handler(req, res) {
     });
     const pendiente = rows[0];
 
+    const autor = await nombreUsuario(client, b.creado_por ?? 1);
     await client.execute({
       sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, 'Creado', ?, ?)`,
-      args: [pendiente.id, `origen: ${b.origen ?? 'manual'}`, b.creado_por ?? 1],
+      args: [pendiente.id, autor ? `por ${autor}` : null, b.creado_por ?? 1],
     });
     if (b.responsable_id) {
+      const responsable = await nombreUsuario(client, b.responsable_id);
       await client.execute({
         sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, 'Delegado', ?, ?)`,
-        args: [pendiente.id, `a responsable ${b.responsable_id}`, b.creado_por ?? 1],
+        args: [pendiente.id, responsable ? `a ${responsable}` : null, b.creado_por ?? 1],
       });
     }
     return sendJson(res, pendiente, 201);

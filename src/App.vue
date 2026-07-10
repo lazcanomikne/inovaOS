@@ -30,8 +30,8 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue';
-import { f7 } from 'framework7-vue';
+import { reactive, ref, onMounted } from 'vue';
+import { f7, f7ready } from 'framework7-vue';
 import routes from '@/js/routes.js';
 
 const f7params = reactive({
@@ -55,7 +55,17 @@ const tabs = [
 const active = ref('home');
 
 function show(id) {
-  active.value = id;
   f7.tab.show(`#view-${id}`);
 }
+
+// Mantiene el resaltado de la pastilla sincronizado, incluso cuando otra
+// pantalla cambia de tab por código (p. ej. al guardar un pendiente).
+onMounted(() => {
+  f7ready(() => {
+    f7.on('tabShow', (tabEl) => {
+      const id = tabEl?.id?.replace('view-', '');
+      if (id) active.value = id;
+    });
+  });
+});
 </script>

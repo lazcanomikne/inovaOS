@@ -55,10 +55,11 @@
 </template>
 
 <script setup>
-import { ref, computed, getCurrentInstance } from 'vue';
+import { ref, computed } from 'vue';
+import { f7 } from 'framework7-vue';
+import { store } from '@/js/store.js';
 
-const { proxy } = getCurrentInstance();
-const usuario = ref({ nombre: 'Carolina G.', rol: 'Dirección General' });
+const usuario = computed(() => store.usuario);
 const notif = ref(true);
 const version = __APP_VERSION__ || '0.1.0';
 const buildId = __BUILD_ID__ || '—';
@@ -72,8 +73,7 @@ const actualizando = ref(false);
 async function buscarActualizacion() {
   if (actualizando.value) return;
   actualizando.value = true;
-  const $f7 = proxy.$f7;
-  $f7.toast.create({ text: 'Actualizando app…', position: 'center', closeTimeout: 4000 }).open();
+  f7.toast.create({ text: 'Actualizando app…', position: 'center', closeTimeout: 4000 }).open();
 
   // Recarga forzando red (sin caché HTTP). Se llama sí o sí.
   const recargar = () => {

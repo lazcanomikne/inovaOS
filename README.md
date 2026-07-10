@@ -63,8 +63,17 @@ src/
 |---|---|---|
 | GET | `/api/pendientes` | Lista (filtro `?responsable_id=`) |
 | POST | `/api/pendientes` | Crear / delegar |
-| GET | `/api/pendientes/:id` | Detalle + historial |
-| PATCH | `/api/pendientes/:id` | Actualizar / cambiar estatus |
-| DELETE | `/api/pendientes/:id` | Eliminar |
+| GET | `/api/pendientes/:id` | Detalle + historial + checklist |
+| PATCH | `/api/pendientes/:id` | Actualizar / cambiar estatus (escribe historial) |
+| DELETE | `/api/pendientes/:id` | Eliminar (cascada: historial y checklist) |
 | GET | `/api/tablero` | Semáforo + próximos |
 | GET | `/api/usuarios` | Usuarios |
+| GET | `/api/checklist?pendiente_id=` | Ítems del checklist |
+| POST | `/api/checklist` | Crear ítem `{ pendiente_id, texto }` |
+| PATCH | `/api/checklist/:itemId` | Marcar/desmarcar `{ completado }` |
+| DELETE | `/api/checklist/:itemId` | Eliminar ítem |
+
+## Desarrollo con API real
+`npm run dev` (Vite, :5173) hace proxy de `/api` → `http://127.0.0.1:3000`.
+Levanta el API en otra terminal con `npx vercel dev --listen 3000` y tendrás
+front + base de datos Turso reales en local.

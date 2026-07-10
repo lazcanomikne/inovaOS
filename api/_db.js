@@ -34,6 +34,13 @@ export function colorEstatus(p) {
   return 'tiempo';
 }
 
+// Nombre de un usuario por id (para escribir historial legible). null si no existe.
+export async function nombreUsuario(client, id) {
+  if (!id) return null;
+  const { rows } = await client.execute({ sql: 'SELECT nombre FROM usuarios WHERE id = ?', args: [id] });
+  return rows[0]?.nombre ?? null;
+}
+
 // Parseo defensivo del body (Vercel ya lo parsea si es JSON, pero por si acaso)
 export function readBody(req) {
   if (!req.body) return {};
