@@ -24,9 +24,17 @@ import {
 } from '../_auth.js';
 import { enviarCodigo } from '../_mail.js';
 
-const RP_ID = () => process.env.WEBAUTHN_RP_ID || 'localhost';
-const ORIGIN = () => process.env.WEBAUTHN_ORIGIN || 'http://localhost:5173';
-const RP_NAME = () => process.env.WEBAUTHN_RP_NAME || 'INOVATECH OS';
+// Contexto WebAuthn. Se deriva del propio request para no depender de que
+// las variables estén perfectas; las env var, si existen, tienen prioridad.
+function webauthn(req) {
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
+  const proto = req.headers['x-forwarded-proto'] || (host.startsWith('localhost') ? 'http' : 'https');
+  return {
+    rpID: process.env.WEBAUTHN_RP_ID || host.split(':')[0],
+    origin: process.env.WEBAUTHN_ORIGIN || `${proto}://${host}`,
+    rpName: process.env.WEBAUTHN_RP_NAME || 'INOVATECH OS',
+  };
+}
 
 const nombreDispositivo = (req) => {
   const ua = req.headers['user-agent'] || '';
@@ -77,6 +85,8 @@ export default async function handler(req, res) {
     .pathname
     .replace(/^\/api\/auth\/?/, '')
     .replace(/\/+$/, '');
+
+  const wa = webauthn(req);
 
   try {
     switch (`${req.method} ${ruta}`) {
@@ -130,8 +140,8 @@ export default async function handler(req, res) {
         if (!u) return;
         const existentes = await credencialesDe(u.id);
         const opciones = await generateRegistrationOptions({
-          rpName: RP_NAME(),
-          rpID: RP_ID(),
+          rpName: wa.rpName,
+          rpID: wa.rpID,
           userID: isoUint8Array.fromUTF8String(String(u.id)),
           userName: u.email,
           userDisplayName: u.nombre,
@@ -157,8 +167,8 @@ export default async function handler(req, res) {
         const v = await verifyRegistrationResponse({
           response: respuesta,
           expectedChallenge: challenge,
-          expectedOrigin: ORIGIN(),
-          expectedRPID: RP_ID(),
+          expectedOrigin: wa.origin,
+          expectedRPID: wa.rpID,
           requireUserVerification: false,
         });
         if (!v.verified || !v.registrationInfo) return sendError(res, 'No se pudo verificar la passkey', 400);
@@ -189,7 +199,7 @@ export default async function handler(req, res) {
         if (!creds.length) return sendError(res, 'No hay passkeys para este correo', 404);
 
         const opciones = await generateAuthenticationOptions({
-          rpID: RP_ID(),
+          rpID: wa.rpID,
           userVerification: 'preferred',
           allowCredentials: creds.map((c) => ({ id: c.credential_id, transports: transportsDe(c) })),
         });
@@ -214,8 +224,8 @@ export default async function handler(req, res) {
         const v = await verifyAuthenticationResponse({
           response: respuesta,
           expectedChallenge: challenge,
-          expectedOrigin: ORIGIN(),
-          expectedRPID: RP_ID(),
+          expectedOrigin: wa.origin,
+          expectedRPID: wa.rpID,
           requireUserVerification: false,
           credential: {
             id: cred.credential_id,
