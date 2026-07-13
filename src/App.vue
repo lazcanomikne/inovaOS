@@ -13,6 +13,7 @@
         <f7-view id="view-pendientes" tab url="/pendientes/" />
         <f7-view id="view-captura" tab url="/captura/" />
         <f7-view id="view-tablero" tab url="/tablero/" />
+        <f7-view id="view-asistente" tab url="/asistente/" />
         <f7-view id="view-perfil" tab url="/perfil/" />
       </f7-views>
 
@@ -59,6 +60,7 @@ const tabs = [
   { id: 'pendientes', label: 'Pendientes', icon: 'square_list_fill' },
   { id: 'captura', label: 'Crear', icon: 'plus' },
   { id: 'tablero', label: 'Tablero', icon: 'chart_pie_fill' },
+  { id: 'asistente', label: 'IA', icon: 'sparkles' },
   { id: 'perfil', label: 'Perfil', icon: 'person_fill' },
 ];
 

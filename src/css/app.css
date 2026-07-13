@@ -197,8 +197,8 @@ html {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  min-width: 52px;
-  padding: 6px 8px;
+  min-width: 48px;
+  padding: 6px 6px;
   border: none;
   background: transparent;
   border-radius: 16px;

@@ -12,6 +12,7 @@
     "db:seed": "node --env-file-if-exists=.env scripts/migrate.mjs --seed"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
     "@libsql/client": "^0.14.0",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.2",
