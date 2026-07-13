@@ -84,8 +84,8 @@ export const RECORDATORIOS = {
   '1dia': { texto: 'Vence mañana', color: '#ff9f0a', urgente: false },
   hoy: { texto: 'Vence hoy', color: '#ff9f0a', urgente: true },
   vencido24: { texto: 'Vencido — 1 día de retraso', color: '#ff453a', urgente: true },
-  vencido48: { texto: 'Vencido — 2 días · escalado a tu jefe directo', color: '#ff453a', urgente: true },
-  vencido72: { texto: 'Vencido — 3 días · escalado a Dirección', color: '#ff453a', urgente: true },
+  vencido48: { texto: 'Vencido — 2 días de retraso', color: '#ff453a', urgente: true },
+  vencido72: { texto: 'Vencido — 3 días · retraso crítico', color: '#ff453a', urgente: true },
 };
 
 function fechaLarga(iso) {
