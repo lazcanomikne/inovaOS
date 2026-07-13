@@ -9,16 +9,16 @@ export default async function handler(req, res) {
   const client = db();
 
   if (req.method === 'GET') {
-    const responsable = req.query.responsable_id;
-    let sql = `
-      SELECT p.*, u.nombre AS responsable_nombre
-      FROM pendientes p
-      LEFT JOIN usuarios u ON u.id = p.responsable_id
-    `;
-    const args = [];
-    if (responsable) { sql += ' WHERE p.responsable_id = ?'; args.push(responsable); }
-    sql += ' ORDER BY p.fecha_compromiso IS NULL, p.fecha_compromiso ASC';
-    const { rows } = await client.execute({ sql, args });
+    // Cada quien ve SÓLO lo suyo: lo que le asignaron o lo que él delegó.
+    const { rows } = await client.execute({
+      sql: `
+        SELECT p.*, u.nombre AS responsable_nombre
+        FROM pendientes p
+        LEFT JOIN usuarios u ON u.id = p.responsable_id
+        WHERE p.creado_por = ? OR p.responsable_id = ?
+        ORDER BY p.fecha_compromiso IS NULL, p.fecha_compromiso ASC`,
+      args: [sesion.id, sesion.id],
+    });
     return sendJson(res, rows);
   }
 

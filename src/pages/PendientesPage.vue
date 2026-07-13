@@ -5,6 +5,20 @@
       <f7-nav-title-large>Pendientes</f7-nav-title-large>
     </f7-navbar>
 
+    <!-- Relación: para mí / yo delegué -->
+    <div class="segmentado glass">
+      <button
+        v-for="r in relaciones"
+        :key="r.key"
+        type="button"
+        class="seg-btn"
+        :class="{ active: relacion === r.key }"
+        @click="relacion = r.key"
+      >
+        {{ r.label }}
+      </button>
+    </div>
+
     <div class="filtros-scroll">
       <div
         v-for="f in filtros"
@@ -41,6 +55,9 @@
                 <div class="item-after badge-glass">{{ p.prioridad }}</div>
               </div>
               <div class="item-subtitle">
+                <span v-if="etiquetaRelacion(p)" class="rel-tag" :class="'rel-' + relacionCon(p, store.usuario)">
+                  {{ etiquetaRelacion(p) }}
+                </span>
                 {{ p.responsable_nombre || 'Sin asignar' }} · {{ etiquetaEstatus(p.estatus) }}
               </div>
               <div class="item-text">Vence {{ formatFecha(p.fecha_compromiso) }}</div>
@@ -50,10 +67,8 @@
         <li v-if="!filtrados.length">
           <div class="item-content">
             <div class="item-inner vacio">
-              <span class="text-color-gray">
-                {{ filtro === 'todos' ? 'Aún no hay pendientes.' : `Nada en «${etiquetaFiltro}».` }}
-              </span>
-              <a v-if="filtro !== 'todos'" class="link" @click="filtro = 'todos'">Ver todos</a>
+              <span class="text-color-gray">{{ mensajeVacio }}</span>
+              <a v-if="filtro !== 'todos' || relacion !== 'todas'" class="link" @click="limpiarFiltros">Ver todos</a>
             </div>
           </div>
         </li>
@@ -66,12 +81,34 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { api } from '@/js/api.js';
 import { store, setFiltro } from '@/js/store.js';
-import { estatusColor, etiquetaEstatus, formatFecha, CERRADOS } from '@/js/pendientes.js';
+import { estatusColor, etiquetaEstatus, formatFecha, CERRADOS, relacionCon } from '@/js/pendientes.js';
 
 const props = defineProps({ f7router: Object });
 const loading = ref(true);
 const error = ref('');
 const items = ref([]);
+
+// Relación con el pendiente. Sobrevive a la navegación (la vista queda montada).
+const relacion = ref('todas');
+const relaciones = [
+  { key: 'todas', label: 'Todas' },
+  { key: 'mia', label: 'Para mí' },
+  { key: 'delegada', label: 'Yo delegué' },
+];
+function coincideRelacion(p) {
+  if (relacion.value === 'todas') return true;
+  const r = relacionCon(p, store.usuario);
+  if (relacion.value === 'mia') return r === 'mia' || r === 'ambas';
+  if (relacion.value === 'delegada') return r === 'delegada' || r === 'ambas';
+  return true;
+}
+function etiquetaRelacion(p) {
+  const r = relacionCon(p, store.usuario);
+  if (r === 'ambas') return 'Mío';
+  if (r === 'mia') return 'Para mí';
+  if (r === 'delegada') return 'Delegué';
+  return '';
+}
 // Fuente única: el filtro vive en el store, así Inicio puede fijarlo
 // (al tocar una tarjeta del semáforo) y la lista lo refleja al instante.
 const filtro = computed({
@@ -97,9 +134,24 @@ function coincide(p, key) {
   return estatusColor(p) === key;
 }
 
-const filtrados = computed(() => items.value.filter((p) => coincide(p, filtro.value)));
-const conteo = (key) => (key === 'todos' ? 0 : items.value.filter((p) => coincide(p, key)).length);
+// Primero acotamos por relación, luego por estatus (los conteos de los chips
+// reflejan la relación elegida).
+const enRelacion = computed(() => items.value.filter(coincideRelacion));
+const filtrados = computed(() => enRelacion.value.filter((p) => coincide(p, filtro.value)));
+const conteo = (key) => (key === 'todos' ? 0 : enRelacion.value.filter((p) => coincide(p, key)).length);
 const etiquetaFiltro = computed(() => filtros.find((f) => f.key === filtro.value)?.label ?? '');
+
+const mensajeVacio = computed(() => {
+  if (filtro.value !== 'todos') return `Nada en «${etiquetaFiltro.value}».`;
+  if (relacion.value === 'mia') return 'No tienes pendientes asignados.';
+  if (relacion.value === 'delegada') return 'No has delegado pendientes.';
+  return 'Aún no hay pendientes.';
+});
+
+function limpiarFiltros() {
+  filtro.value = 'todos';
+  relacion.value = 'todas';
+}
 
 function abrir(id) { props.f7router.navigate(`/pendientes/${id}/`); }
 
@@ -121,6 +173,24 @@ watch(() => store.tick, cargar);
 </script>
 
 <style scoped>
+.segmentado {
+  display: flex; margin: 8px 16px 0; padding: 4px; border-radius: 14px; gap: 4px;
+}
+.seg-btn {
+  flex: 1; border: none; background: transparent; cursor: pointer;
+  padding: 8px 6px; border-radius: 10px; font-size: 13px; font-weight: 600;
+  color: rgba(60, 60, 67, 0.6); transition: all 0.15s ease;
+}
+.seg-btn.active {
+  background: #fff; color: var(--inova-primary);
+  box-shadow: 0 1px 4px rgba(17, 12, 46, 0.12);
+}
+.rel-tag {
+  font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-right: 6px;
+}
+.rel-mia, .rel-ambas { background: rgba(91, 91, 214, 0.14); color: var(--inova-primary); }
+.rel-delegada { background: rgba(255, 159, 10, 0.16); color: #b26a00; }
+
 .filtros-scroll {
   display: flex; gap: 8px; padding: 8px 16px; overflow-x: auto;
   -webkit-overflow-scrolling: touch; scrollbar-width: none;

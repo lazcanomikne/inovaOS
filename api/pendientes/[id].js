@@ -1,6 +1,6 @@
 import { db, sendJson, sendError, readBody, nombreUsuario } from '../_db.js';
 import { requiereSesion } from '../_auth.js';
-import { validarActualizacion, puedeEliminar } from '../_permisos.js';
+import { validarActualizacion, puedeEliminar, puedeVer } from '../_permisos.js';
 
 function etiqueta(e) {
   return {
@@ -30,6 +30,8 @@ export default async function handler(req, res) {
       args: [id],
     });
     if (!rows.length) return sendError(res, 'No encontrado', 404);
+    // Sólo el creador o el responsable pueden abrirlo (404 para no filtrar existencia).
+    if (!puedeVer(rows[0], sesion)) return sendError(res, 'No encontrado', 404);
 
     // created_at viene en UTC ('YYYY-MM-DD HH:MM:SS'); el cliente lo pasa a hora local.
     const { rows: historial } = await client.execute({
@@ -95,7 +97,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'DELETE') {
     const actual = await traer(client, id);
-    if (!actual) return sendError(res, 'No encontrado', 404);
+    if (!actual || !puedeVer(actual, sesion)) return sendError(res, 'No encontrado', 404);
     if (!puedeEliminar(actual, sesion)) return sendError(res, 'Sólo quien delegó el pendiente puede eliminarlo', 403);
 
     await client.execute({ sql: 'DELETE FROM pendientes WHERE id = ?', args: [id] });

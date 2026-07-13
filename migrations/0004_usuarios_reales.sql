@@ -6,6 +6,6 @@ INSERT OR IGNORE INTO usuarios (nombre, email, rol) VALUES
   ('Elvis Martínez',   'elvis.martinez@inovatech.com.mx',    'colaborador'),
   ('Noé Cruz',         'noe.cruz@inovatech.com.mx',          'colaborador'),
   ('Carolina Guajardo','carolina.guajardo@inovatech.com.mx', 'direccion'),
-  ('Leonardo Lazcano', 'lazcano@ekontech.com',               'direccion'),
+  ('Leonardo Lazcano', 'lazcano@ekrontech.com',              'direccion'),
   ('Gabriel Oviedo',   'gabriel.oviedo@inovatech.com.mx',    'colaborador'),
   ('Alan Rodríguez',   'alan.rodriguez@inovatech.com.mx',    'colaborador');

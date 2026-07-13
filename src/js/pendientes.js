@@ -58,13 +58,23 @@ export function horaLocal(createdAt) {
 
 /* ------------------------- Permisos ------------------------- */
 
-export const esDireccion = (u) => u?.rol === 'direccion';
 export const esCreador = (p, u) => !!u && p.creado_por === u.id;
 export const esResponsable = (p, u) => !!u && p.responsable_id === u.id;
 
-// Dirección puede todo; si no, sólo su rol en el pendiente.
-const puedeComoResponsable = (p, u) => esResponsable(p, u) || esDireccion(u);
-const puedeComoCreador = (p, u) => esCreador(p, u) || esDireccion(u);
+// Cada quien actúa según su papel en el pendiente. Dirección no tiene poderes
+// extra (decisión de negocio: ve y actúa igual que un colaborador).
+const puedeComoResponsable = (p, u) => esResponsable(p, u);
+const puedeComoCreador = (p, u) => esCreador(p, u);
+
+// Relación del usuario con el pendiente (para filtrar/etiquetar en la UI).
+export function relacionCon(p, u) {
+  const mia = esResponsable(p, u); // me lo asignaron
+  const delegada = esCreador(p, u); // yo lo delegué
+  if (mia && delegada) return 'ambas';
+  if (mia) return 'mia';
+  if (delegada) return 'delegada';
+  return null;
+}
 
 // El creador (o dirección) edita y elimina. No se edita lo ya aprobado.
 export const puedeEditar = (p, u) => puedeComoCreador(p, u) && p.estatus !== 'aprobado';
