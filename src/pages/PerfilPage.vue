@@ -65,6 +65,32 @@
       </ul>
     </div>
 
+    <!-- Notificaciones push -->
+    <div class="block-title">Notificaciones</div>
+    <div class="list glass-list no-hairlines">
+      <ul>
+        <li v-if="pushEstado === 'activo' || pushEstado === 'inactivo'" class="item-content">
+          <div class="item-inner">
+            <div class="item-title">
+              Notificaciones push
+              <div class="item-footer">Recordatorios de tus pendientes en este dispositivo</div>
+            </div>
+            <div class="item-after">
+              <label class="toggle toggle-init">
+                <input type="checkbox" :checked="pushEstado === 'activo'" :disabled="pushCargando" @change="togglePush" />
+                <span class="toggle-icon"></span>
+              </label>
+            </div>
+          </div>
+        </li>
+        <li v-else class="item-content">
+          <div class="item-inner">
+            <div class="item-title text-color-gray" style="font-weight:400;font-size:14px;">{{ pushMensaje }}</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+
     <div class="list glass-list no-hairlines">
       <ul>
         <li class="item-content">
@@ -101,6 +127,7 @@ import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
 import { store, limpiarSesion } from '@/js/store.js';
 import { tieneFaceId, registrarPasskey } from '@/js/passkey.js';
+import { estadoPush, activarPush, desactivarPush } from '@/js/push.js';
 
 const usuario = computed(() => store.usuario ?? { nombre: '', rol: '', email: '' });
 const version = __APP_VERSION__ || '0.1.0';
@@ -116,6 +143,37 @@ const iniciales = computed(() =>
 const passkeys = ref([]);
 const soportaFaceId = ref(false);
 const actualizando = ref(false);
+
+// Notificaciones push
+const pushEstado = ref('no-soportado');
+const pushCargando = ref(false);
+const pushMensaje = computed(() => ({
+  'no-soportado': 'Este dispositivo no soporta notificaciones push.',
+  'no-instalada': 'Para recibir notificaciones, añade InovaOS a tu pantalla de inicio.',
+  bloqueado: 'Notificaciones bloqueadas. Actívalas en los ajustes de tu dispositivo.',
+}[pushEstado.value] || ''));
+
+async function refrescarPush() {
+  try { pushEstado.value = await estadoPush(); } catch { pushEstado.value = 'no-soportado'; }
+}
+
+async function togglePush(e) {
+  const activar = e.target.checked;
+  pushCargando.value = true;
+  try {
+    if (activar) {
+      await activarPush();
+      f7.toast.create({ text: 'Notificaciones activadas ✓', closeTimeout: 1800, position: 'center' }).open();
+    } else {
+      await desactivarPush();
+    }
+  } catch (err) {
+    f7.dialog.alert(err.message || 'No se pudo cambiar.', 'Notificaciones');
+  } finally {
+    await refrescarPush();
+    pushCargando.value = false;
+  }
+}
 
 const fecha = (iso) => new Date(iso.replace(' ', 'T') + 'Z').toLocaleDateString();
 
@@ -177,6 +235,7 @@ async function buscarActualizacion() {
 onMounted(async () => {
   soportaFaceId.value = await tieneFaceId();
   await cargarPasskeys();
+  await refrescarPush();
 });
 </script>
 

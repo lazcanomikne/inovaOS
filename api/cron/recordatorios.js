@@ -5,7 +5,8 @@
 // Lo dispara Vercel Cron (config en vercel.json) a las 14:00 UTC (~8am MX).
 // Protegido con CRON_SECRET: Vercel manda `Authorization: Bearer <CRON_SECRET>`.
 import { db, sendJson, sendError } from '../_db.js';
-import { enviarRecordatorio } from '../_mail.js';
+import { enviarRecordatorio, RECORDATORIOS } from '../_mail.js';
+import { enviarPush } from '../_push.js';
 
 // días hasta el vencimiento  ->  tipo de recordatorio
 const VENTANAS = { 3: '3dias', 2: '2dias', 1: '1dia', 0: 'hoy', '-1': 'vencido24', '-2': 'vencido48', '-3': 'vencido72' };
@@ -70,6 +71,14 @@ export default async function handler(req, res) {
 
     try {
       await enviarRecordatorio(p.responsable_email, p, tipo);
+      // Misma lógica en push: notificación nativa al responsable (si tiene suscripción).
+      const r = RECORDATORIOS[tipo] || {};
+      await enviarPush(p.responsable_id, {
+        title: `${r.urgente ? '⚠️ ' : ''}${r.texto || 'Recordatorio'}`,
+        body: p.titulo,
+        url: '/',
+        tag: `pend-${p.id}`,
+      }).catch(() => {});
       await client.execute({
         sql: 'INSERT OR IGNORE INTO recordatorios_enviados (pendiente_id, tipo, enviado_a) VALUES (?, ?, ?)',
         args: [p.id, clave, p.responsable_email],

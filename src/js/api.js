@@ -66,6 +66,11 @@ export const api = {
     registrar: (body) => request('/evidencias', { method: 'POST', body }),
     remove: (id) => request(`/evidencias/${id}`, { method: 'DELETE' }),
   },
+  push: {
+    llavePublica: () => request('/push'),
+    suscribir: (subscription, dispositivo) => request('/push', { method: 'POST', body: { subscription, dispositivo } }),
+    desuscribir: (endpoint) => request('/push', { method: 'DELETE', body: { endpoint } }),
+  },
   auth: {
     yo: () => request('/auth/yo'),
     solicitarCodigo: (email) => request('/auth/solicitar-codigo', { method: 'POST', body: { email } }),
