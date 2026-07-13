@@ -3,6 +3,7 @@
 // usuario (mismo aislamiento que el resto del API). Dirección ve todo; el resto,
 // sólo lo suyo (creado_por o responsable_id = su id).
 import { validarActualizacion } from './_permisos.js';
+import { notificarCambio } from './_push.js';
 
 const CERRADOS = ['concluido', 'aprobado'];
 const ETIQUETAS = {
@@ -214,6 +215,7 @@ export async function ejecutarHerramienta(client, sesion, nombre, input = {}) {
           sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, 'Delegado', ?, ?)`,
           args: [id, `a ${responsableNombre}`, sesion.id],
         });
+        await notificarCambio({ id, titulo: input.titulo, creado_por: sesion.id, responsable_id: responsableId }, 'delegado', sesion);
       }
       return { ok: true, id, mensaje: `Creado el pendiente #${id}${responsableNombre ? ` y asignado a ${responsableNombre}` : ' (sin asignar)'}.` };
     }
@@ -243,6 +245,7 @@ export async function ejecutarHerramienta(client, sesion, nombre, input = {}) {
         sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, ?, ?, ?)`,
         args: [input.id, ETIQUETAS[estatus], `por ${sesion.nombre} (asistente)`, sesion.id],
       });
+      await notificarCambio({ id: p.id, titulo: p.titulo, creado_por: p.creado_por, responsable_id: p.responsable_id }, estatus, sesion);
       return { ok: true, mensaje: `El pendiente #${input.id} pasó a "${ETIQUETAS[estatus]}".` };
     }
 

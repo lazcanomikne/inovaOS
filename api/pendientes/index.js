@@ -1,5 +1,6 @@
 import { db, sendJson, sendError, readBody, nombreUsuario } from '../_db.js';
 import { requiereSesion } from '../_auth.js';
+import { notificarCambio } from '../_push.js';
 
 // /api/pendientes  → GET lista · POST crear/delegar   (requiere sesión)
 export default async function handler(req, res) {
@@ -59,6 +60,8 @@ export default async function handler(req, res) {
         sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, 'Delegado', ?, ?)`,
         args: [pendiente.id, responsable ? `a ${responsable}` : null, creadoPor],
       });
+      // Push en tiempo real al responsable: "te asignaron un pendiente".
+      await notificarCambio(pendiente, 'delegado', sesion);
     }
     return sendJson(res, pendiente, 201);
   }

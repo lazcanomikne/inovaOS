@@ -39,3 +39,49 @@ export async function enviarPush(usuarioId, payload) {
   }
   return entregadas;
 }
+
+// Mensaje según el estatus al que pasó el pendiente. `soyCreador` indica si
+// quien hizo la acción es el creador (para distinguir "iniciar" de "devolver").
+function mensajeCambio(estatus, quien, titulo, soyCreador) {
+  const t = `"${titulo}"`;
+  switch (estatus) {
+    case 'delegado': return { title: '📌 Nuevo pendiente', body: `${quien} te asignó ${t}` };
+    case 'aceptado': return { title: '✅ Aceptado', body: `${quien} aceptó ${t}` };
+    case 'reagendado': return { title: '📅 Reagendado', body: `${quien} propuso otra fecha para ${t}` };
+    case 'en_espera': return { title: '⏸️ En espera', body: `${quien} puso en espera ${t}` };
+    case 'concluido': return { title: '🎯 Por revisar', body: `${quien} concluyó ${t}` };
+    case 'aprobado': return { title: '🎉 Aprobado', body: `${quien} aprobó ${t}` };
+    case 'en_progreso':
+      return soyCreador
+        ? { title: '↩️ Devuelto', body: `${quien} te devolvió ${t} para ajustes` }
+        : { title: '▶️ En progreso', body: `${quien} inició ${t}` };
+    default: return null;
+  }
+}
+
+/**
+ * Notifica al usuario correspondiente cuando un pendiente cambia de estatus.
+ * Siempre avisa a la OTRA parte (no a quien hizo la acción):
+ *   - si actúa el creador  -> avisa al responsable
+ *   - si actúa el responsable -> avisa al creador
+ * `pendiente` requiere: id, titulo, creado_por, responsable_id.
+ * `actor` requiere: id, nombre.
+ */
+export async function notificarCambio(pendiente, estatus, actor) {
+  const creador = Number(pendiente.creado_por);
+  const responsable = Number(pendiente.responsable_id);
+  const actorId = Number(actor.id);
+  const soyCreador = actorId === creador;
+  const destinatario = soyCreador ? responsable : creador;
+  if (!destinatario || destinatario === actorId) return 0; // nadie más a quien avisar
+
+  const quien = (actor.nombre || 'Alguien').split(' ')[0];
+  const msg = mensajeCambio(estatus, quien, pendiente.titulo, soyCreador);
+  if (!msg) return 0;
+
+  try {
+    return await enviarPush(destinatario, { ...msg, url: '/', tag: `pend-${pendiente.id}` });
+  } catch {
+    return 0; // una push fallida nunca debe tumbar la acción del ticket
+  }
+}

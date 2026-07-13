@@ -1,6 +1,7 @@
 import { db, sendJson, sendError, readBody, nombreUsuario } from '../_db.js';
 import { requiereSesion } from '../_auth.js';
 import { validarActualizacion, puedeEliminar, puedeVer } from '../_permisos.js';
+import { notificarCambio } from '../_push.js';
 
 function etiqueta(e) {
   return {
@@ -107,6 +108,16 @@ export default async function handler(req, res) {
         sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, 'Editado', ?, ?)`,
         args: [id, `${porActor} · campos: ${editados.join(', ')}`, sesion.id],
       });
+    }
+
+    // Push en tiempo real a la otra parte cuando cambia el estatus.
+    if (estatus) {
+      await notificarCambio({
+        id,
+        titulo: b.titulo ?? actual.titulo,
+        creado_por: actual.creado_por,
+        responsable_id: b.responsable_id ?? actual.responsable_id,
+      }, estatus, sesion);
     }
 
     return sendJson(res, await traer(client, id));
