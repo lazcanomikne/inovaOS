@@ -25,7 +25,7 @@ export default async function handler(req, res) {
   if (!rows.length || !puedeVer(rows[0], sesion)) return sendError(res, 'No encontrado', 404);
 
   // Borra el archivo de Blob (si falla, seguimos: no dejamos el registro colgado).
-  try { await del(rows[0].url); } catch { /* ignore */ }
+  try { await del(rows[0].url, { token: process.env.BLOB_READ_WRITE_TOKEN }); } catch { /* ignore */ }
 
   await client.execute({ sql: 'DELETE FROM evidencias WHERE id = ?', args: [id] });
   return sendJson(res, { ok: true });

@@ -13,6 +13,7 @@ const TIPOS = [
 export default async function handler(req, res) {
   try {
     const jsonResponse = await handleUpload({
+      token: process.env.BLOB_READ_WRITE_TOKEN, // explícito: evita el modo OIDC
       body: req.body,
       request: req,
       onBeforeGenerateToken: async (pathname, clientPayload) => {

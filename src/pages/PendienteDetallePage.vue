@@ -372,17 +372,19 @@ watch(() => store.tick, cargar);
 .evid-vacio i { font-size: 20px; color: var(--st-hoy); flex-shrink: 0; }
 .evid-grid { display: flex; flex-direction: column; gap: 10px; }
 .evid-item { border-radius: 14px; padding: 8px; display: flex; align-items: center; gap: 12px; }
-.evid-abrir { flex-shrink: 0; }
+.evid-abrir { flex: 0 0 auto; }
 .evid-thumb {
   width: 52px; height: 52px; border-radius: 10px; object-fit: cover; display: block; background: rgba(0,0,0,0.05);
 }
 .evid-pdf { display: flex; align-items: center; justify-content: center; }
 .evid-pdf i { font-size: 26px; color: var(--st-vencido); }
-.evid-meta { flex: 1; min-width: 0; }
+.evid-meta { flex: 1 1 auto; min-width: 0; }
 .evid-nombre { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.evid-sub { font-size: 12px; opacity: 0.55; margin-top: 2px; }
+.evid-sub { font-size: 12px; opacity: 0.55; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .evid-del {
-  border: none; background: transparent; cursor: pointer; padding: 8px; flex-shrink: 0;
+  flex: 0 0 auto; width: 40px; height: 40px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; cursor: pointer;
   color: var(--st-vencido); opacity: 0.7;
 }
 .evid-del i { font-size: 20px; }
