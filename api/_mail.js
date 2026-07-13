@@ -79,6 +79,11 @@ const COLOR_PRIORIDAD = { Alta: '#ff453a', Media: '#ff9f0a', Baja: '#30d158' };
 
 // Encuadre de cada recordatorio (coincide con la franja del diagrama).
 export const RECORDATORIOS = {
+  por_aceptar: {
+    texto: 'Pendiente por aceptar', color: '#5b5bd6', urgente: false,
+    intro: 'Te asignaron este pendiente', cta: 'Aceptar pendiente',
+    nota: 'Aún no lo has aceptado. Ábrelo para aceptarlo o proponer otra fecha.',
+  },
   '3dias': { texto: 'Vence en 3 días', color: '#30d158', urgente: false },
   '2dias': { texto: 'Vence en 2 días', color: '#ff9f0a', urgente: false },
   '1dia': { texto: 'Vence mañana', color: '#ff9f0a', urgente: false },
@@ -121,9 +126,11 @@ export function plantillaRecordatorio(p, tipo) {
 
         <!-- Cuerpo -->
         <tr><td style="padding:24px;">
-          <p style="margin:0 0 4px;font-size:13px;color:#8a8699;">Recordatorio de pendiente</p>
+          <p style="margin:0 0 4px;font-size:13px;color:#8a8699;">${r.intro || 'Recordatorio de pendiente'}</p>
           <h1 style="margin:0 0 4px;font-size:21px;font-weight:800;color:#15102b;letter-spacing:-.02em;line-height:1.25;">${p.titulo}</h1>
-          ${p.descripcion ? `<p style="margin:0 0 16px;font-size:14px;color:#5b5768;line-height:1.5;">${p.descripcion}</p>` : '<div style="height:10px"></div>'}
+          ${p.descripcion ? `<p style="margin:0 0 14px;font-size:14px;color:#5b5768;line-height:1.5;">${p.descripcion}</p>` : '<div style="height:10px"></div>'}
+
+          ${r.nota ? `<div style="background:${r.color}12;border-radius:12px;padding:12px 14px;margin:0 0 16px;font-size:13px;color:#5b5768;line-height:1.5;">👉 ${r.nota}</div>` : ''}
 
           <table role="presentation" width="100%" style="border-top:1px solid #f0eef8;border-bottom:1px solid #f0eef8;margin:4px 0 20px;">
             ${fila('Responsable', p.responsable_nombre)}
@@ -134,7 +141,7 @@ export function plantillaRecordatorio(p, tipo) {
           </table>
 
           <a href="${APP_URL}" style="display:block;text-align:center;background:linear-gradient(135deg,#5b5bd6,#7c6cf0);color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:14px;border-radius:14px;">
-            Abrir en InovaOS
+            ${r.cta || 'Abrir en InovaOS'}
           </a>
         </td></tr>
 

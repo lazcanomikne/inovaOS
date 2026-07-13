@@ -34,8 +34,8 @@ export default async function handler(req, res) {
           FROM pendientes p
           JOIN usuarios u ON u.id = p.responsable_id
           LEFT JOIN usuarios c ON c.id = p.creado_por
-          WHERE p.fecha_compromiso IS NOT NULL
-            AND p.estatus NOT IN ('concluido','aprobado')`,
+          WHERE p.estatus NOT IN ('concluido','aprobado')
+            AND (p.fecha_compromiso IS NOT NULL OR p.estatus IN ('delegado','reagendado'))`,
     args: [],
   });
 
@@ -43,14 +43,22 @@ export default async function handler(req, res) {
   const resumen = { revisados: pendientes.length, enviados: 0, omitidos: 0, detalle: [] };
 
   for (const p of pendientes) {
-    const d = diasHasta(p.fecha_compromiso, hoyMx);
-    const tipo = VENTANAS[d];
+    // Prioridad: si aún no lo acepta, insistimos en que lo acepte (a diario).
+    // Si ya está en marcha, mandamos el aviso por fecha de vencimiento (una vez).
+    let tipo, clave;
+    if (p.estatus === 'delegado' || p.estatus === 'reagendado') {
+      tipo = 'por_aceptar';
+      clave = `por_aceptar:${hoyMx}`; // clave con fecha => se repite cada día
+    } else {
+      tipo = VENTANAS[diasHasta(p.fecha_compromiso, hoyMx)];
+      clave = tipo; // una sola vez
+    }
     if (!tipo || !p.responsable_email) { resumen.omitidos++; continue; }
 
-    // ¿Ya se envió este tipo para este pendiente?
+    // ¿Ya se envió (esa clave) para este pendiente?
     const ya = await client.execute({
       sql: 'SELECT 1 FROM recordatorios_enviados WHERE pendiente_id = ? AND tipo = ?',
-      args: [p.id, tipo],
+      args: [p.id, clave],
     });
     if (ya.rows.length) { resumen.omitidos++; continue; }
 
@@ -64,7 +72,7 @@ export default async function handler(req, res) {
       await enviarRecordatorio(p.responsable_email, p, tipo);
       await client.execute({
         sql: 'INSERT OR IGNORE INTO recordatorios_enviados (pendiente_id, tipo, enviado_a) VALUES (?, ?, ?)',
-        args: [p.id, tipo, p.responsable_email],
+        args: [p.id, clave, p.responsable_email],
       });
       resumen.enviados++;
       resumen.detalle.push({ id: p.id, tipo, a: p.responsable_email });
