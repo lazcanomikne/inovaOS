@@ -58,8 +58,8 @@ export const api = {
   checklist: {
     list: (pendienteId) => request(`/checklist?pendiente_id=${pendienteId}`),
     create: (body) => request('/checklist', { method: 'POST', body }),
-    toggle: (itemId, completado) => request(`/checklist/${itemId}`, { method: 'PATCH', body: { completado } }),
-    remove: (itemId) => request(`/checklist/${itemId}`, { method: 'DELETE' }),
+    toggle: (itemId, completado) => request(`/checklist?item=${itemId}`, { method: 'PATCH', body: { completado } }),
+    remove: (itemId) => request(`/checklist?item=${itemId}`, { method: 'DELETE' }),
   },
   evidencias: {
     list: (pendienteId) => request(`/evidencias?pendiente_id=${pendienteId}`),

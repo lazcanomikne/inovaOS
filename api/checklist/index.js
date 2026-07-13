@@ -3,8 +3,12 @@ import { requiereSesion } from '../_auth.js';
 import { puedeVer } from '../_permisos.js';
 
 // Un solo endpoint para todo el checklist (así ahorramos una función serverless):
-//   /api/checklist?pendiente_id=1  → GET lista · POST { pendiente_id, texto }
-//   /api/checklist/:itemId         → PATCH { completado, texto } · DELETE
+//   GET  /api/checklist?pendiente_id=1   → lista
+//   POST /api/checklist                   → { pendiente_id, texto }
+//   PATCH  /api/checklist?item=5          → { completado, texto }
+//   DELETE /api/checklist?item=5
+// (El id del ítem va por query, no por path: una función index.js sí matchea
+//  la ruta base en Vercel; un catch-all [[...]] no matchea /api/checklist a secas.)
 
 async function pendienteVisible(client, res, pendienteId, sesion) {
   const { rows } = await client.execute({
@@ -37,10 +41,9 @@ export default async function handler(req, res) {
   if (!sesion) return;
 
   const client = db();
-  const seg = req.query.seg; // undefined en /checklist ; ['5'] en /checklist/5
-  const itemId = Array.isArray(seg) ? seg[0] : seg;
+  const itemId = req.query.item;
 
-  // --- Operaciones sobre un ítem: /checklist/:itemId ---
+  // --- Operaciones sobre un ítem: /checklist?item=5 ---
   if (itemId) {
     if (req.method === 'PATCH') {
       if (!(await itemVisible(client, res, itemId, sesion))) return;
