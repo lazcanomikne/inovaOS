@@ -359,7 +359,13 @@ watch(() => store.tick, cargar);
   font-size: 14px; opacity: 0.8;
 }
 .sin-acciones i { font-size: 20px; color: var(--inova-primary); }
-.timeline-item-content.glass { border-radius: 14px; }
+.timeline-item-content.glass {
+  border-radius: 14px;
+  padding: 10px 14px;
+  flex: 1;
+}
+.timeline-item-title { font-size: 15px; font-weight: 700; line-height: 1.25; }
+.timeline-item-subtitle { font-size: 13px; opacity: 0.6; line-height: 1.35; margin-top: 1px; }
 .tachado { text-decoration: line-through; opacity: 0.5; }
 .check-progreso { float: right; font-size: 13px; font-weight: 700; color: var(--inova-primary); }
 
