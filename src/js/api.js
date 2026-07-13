@@ -61,10 +61,16 @@ export const api = {
     toggle: (itemId, completado) => request(`/checklist/${itemId}`, { method: 'PATCH', body: { completado } }),
     remove: (itemId) => request(`/checklist/${itemId}`, { method: 'DELETE' }),
   },
+  evidencias: {
+    list: (pendienteId) => request(`/evidencias?pendiente_id=${pendienteId}`),
+    registrar: (body) => request('/evidencias', { method: 'POST', body }),
+    remove: (id) => request(`/evidencias/${id}`, { method: 'DELETE' }),
+  },
   auth: {
     yo: () => request('/auth/yo'),
     solicitarCodigo: (email) => request('/auth/solicitar-codigo', { method: 'POST', body: { email } }),
     verificarCodigo: (email, codigo) => request('/auth/verificar-codigo', { method: 'POST', body: { email, codigo } }),
+    registrar: (token, nombre) => request('/auth/registrar', { method: 'POST', body: { token, nombre } }),
     salir: () => request('/auth/salir', { method: 'POST' }),
     passkey: {
       opcionesRegistro: () => request('/auth/passkey/registro/opciones', { method: 'POST' }),

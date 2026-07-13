@@ -45,7 +45,7 @@ import { store, setSesion } from '@/js/store.js';
 import LoginPage from '@/pages/LoginPage.vue';
 
 const f7params = reactive({
-  name: 'INOVATECH OS',
+  name: 'InovaOS',
   theme: 'ios',
   darkMode: false,
   colors: { primary: '#5b5bd6' },

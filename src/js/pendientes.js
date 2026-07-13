@@ -60,6 +60,7 @@ export function horaLocal(createdAt) {
 
 export const esCreador = (p, u) => !!u && p.creado_por === u.id;
 export const esResponsable = (p, u) => !!u && p.responsable_id === u.id;
+export const puedeVer = (p, u) => esCreador(p, u) || esResponsable(p, u);
 
 // Cada quien actúa según su papel en el pendiente. Dirección no tiene poderes
 // extra (decisión de negocio: ve y actúa igual que un colaborador).

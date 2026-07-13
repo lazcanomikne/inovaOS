@@ -45,8 +45,8 @@ export default defineConfig({
       },
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'INOVATECH OS',
-        short_name: 'INOVA OS',
+        name: 'InovaOS',
+        short_name: 'InovaOS',
         description: 'Delegación y seguimiento de pendientes',
         lang: 'es',
         theme_color: '#5b5bd6',

@@ -1,4 +1,4 @@
-# INOVATECH OS
+# InovaOS
 
 PWA de **delegación y seguimiento de pendientes** para dirección general.
 

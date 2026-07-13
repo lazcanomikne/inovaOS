@@ -1,7 +1,7 @@
 <template>
   <f7-page name="home" ptr @ptr:refresh="onRefresh">
     <f7-navbar large transparent>
-      <f7-nav-title>INOVATECH OS</f7-nav-title>
+      <f7-nav-title>InovaOS</f7-nav-title>
       <f7-nav-title-large>Hola, {{ primerNombre }}</f7-nav-title-large>
       <f7-nav-right>
         <f7-link icon-f7="bell_fill" />

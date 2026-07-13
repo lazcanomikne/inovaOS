@@ -30,12 +30,12 @@ const plantilla = (codigo, nombre) => `
     <tr><td align="center">
       <table role="presentation" width="100%" style="max-width:440px;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 6px 24px rgba(17,12,46,.10);">
         <tr><td style="background:linear-gradient(135deg,#5b5bd6,#7c6cf0);padding:22px 24px;">
-          <div style="color:#fff;font-size:18px;font-weight:800;letter-spacing:-.02em;">INOVATECH OS</div>
+          <div style="color:#fff;font-size:18px;font-weight:800;letter-spacing:-.02em;">InovaOS</div>
           <div style="color:rgba(255,255,255,.75);font-size:12px;margin-top:2px;">Tu operación, bajo control.</div>
         </td></tr>
         <tr><td style="padding:28px 24px;">
           <p style="margin:0 0 6px;font-size:16px;color:#15102b;">Hola${nombre ? ' ' + nombre : ''},</p>
-          <p style="margin:0 0 22px;font-size:14px;color:#5b5768;line-height:1.5;">Tu código para entrar a INOVATECH OS:</p>
+          <p style="margin:0 0 22px;font-size:14px;color:#5b5768;line-height:1.5;">Tu código para entrar a InovaOS:</p>
           <div style="text-align:center;margin:0 0 22px;">
             <div style="display:inline-block;background:#f2f1fb;border:1px solid #e2def5;border-radius:14px;padding:16px 26px;font-size:34px;font-weight:800;letter-spacing:10px;color:#5b5bd6;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">${codigo}</div>
           </div>
@@ -51,12 +51,13 @@ const plantilla = (codigo, nombre) => `
 </body></html>`;
 
 export async function enviarCodigo(email, codigo, nombre) {
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  // La marca es InovaOS; la dirección real sigue siendo la del buzón SMTP.
+  const from = `InovaOS <${process.env.SMTP_USER}>`;
   await tx().sendMail({
     from,
     to: email,
-    subject: `${codigo} es tu código de acceso · INOVATECH OS`,
-    text: `Tu código para entrar a INOVATECH OS es ${codigo}. Vence en 10 minutos y sólo sirve una vez. Si no fuiste tú, ignora este correo.`,
+    subject: `${codigo} es tu código de acceso · InovaOS`,
+    text: `Tu código para entrar a InovaOS es ${codigo}. Vence en 10 minutos y sólo sirve una vez. Si no fuiste tú, ignora este correo.`,
     html: plantilla(codigo, nombre),
   });
 }

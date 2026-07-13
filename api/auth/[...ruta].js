@@ -21,6 +21,7 @@ import { db, sendJson, sendError, readBody } from '../_db.js';
 import {
   firmarSesion, sesionDe, requiereSesion, cookieSesion, cookieBorrar,
   generarCodigo, guardarCodigo, validarCodigo, usuarioPorEmail, limiteEnvios, limpiarCodigos,
+  firmarRegistro, emailDeRegistro, crearColaborador,
 } from '../_auth.js';
 import { enviarCodigo } from '../_mail.js';
 
@@ -32,7 +33,7 @@ function webauthn(req) {
   return {
     rpID: process.env.WEBAUTHN_RP_ID || host.split(':')[0],
     origin: process.env.WEBAUTHN_ORIGIN || `${proto}://${host}`,
-    rpName: process.env.WEBAUTHN_RP_NAME || 'INOVATECH OS',
+    rpName: process.env.WEBAUTHN_RP_NAME || 'InovaOS',
   };
 }
 
@@ -99,13 +100,11 @@ export default async function handler(req, res) {
         const limite = await limiteEnvios(email);
         if (limite) return sendError(res, limite, 429);
 
+        // Registro abierto: enviamos el código exista o no la cuenta.
         const usuario = await usuarioPorEmail(email);
-        // Respuesta neutral: no revelamos qué correos están dados de alta.
-        if (!usuario) return sendJson(res, { ok: true });
-
         const codigo = generarCodigo();
         await guardarCodigo(email, codigo);
-        await enviarCodigo(usuario.email, codigo, usuario.nombre.split(' ')[0]);
+        await enviarCodigo(email.trim(), codigo, usuario?.nombre?.split(' ')[0]);
         limpiarCodigos().catch(() => {});
         return sendJson(res, { ok: true });
       }
@@ -117,8 +116,24 @@ export default async function handler(req, res) {
         const r = await validarCodigo(email, String(codigo).trim());
         if (!r.ok) return sendError(res, r.error, 401);
 
-        res.setHeader('Set-Cookie', cookieSesion(await firmarSesion(r.usuario)));
-        return sendJson(res, { usuario: r.usuario });
+        if (r.usuario) {
+          res.setHeader('Set-Cookie', cookieSesion(await firmarSesion(r.usuario)));
+          return sendJson(res, { usuario: r.usuario });
+        }
+        // Correo nuevo: pedimos el nombre. El token prueba que verificó el correo.
+        const token = await firmarRegistro(email.trim());
+        return sendJson(res, { registro: true, token });
+      }
+
+      case 'POST registrar': {
+        const { token, nombre } = readBody(req);
+        const email = await emailDeRegistro(token);
+        if (!email) return sendError(res, 'El registro expiró. Vuelve a empezar.', 400);
+        if (!nombre || nombre.trim().length < 2) return sendError(res, 'Escribe tu nombre completo.');
+
+        const nuevo = await crearColaborador(email, nombre);
+        res.setHeader('Set-Cookie', cookieSesion(await firmarSesion(nuevo)));
+        return sendJson(res, { usuario: nuevo });
       }
 
       case 'GET yo': {

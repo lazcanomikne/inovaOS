@@ -43,7 +43,13 @@ export default async function handler(req, res) {
       sql: 'SELECT * FROM checklist WHERE pendiente_id = ? ORDER BY orden, id',
       args: [id],
     });
-    return sendJson(res, { pendiente: rows[0], historial, checklist });
+    const { rows: evidencias } = await client.execute({
+      sql: `SELECT e.*, u.nombre AS autor
+            FROM evidencias e LEFT JOIN usuarios u ON u.id = e.subido_por
+            WHERE e.pendiente_id = ? ORDER BY e.created_at DESC`,
+      args: [id],
+    });
+    return sendJson(res, { pendiente: rows[0], historial, checklist, evidencias });
   }
 
   if (req.method === 'PATCH' || req.method === 'PUT') {
@@ -71,6 +77,17 @@ export default async function handler(req, res) {
       editaCampos: camposDeEdicion.length > 0,
     });
     if (negado) return sendError(res, negado, 403);
+
+    // Paso 5 del proceso: no se puede CONCLUIR sin al menos una evidencia.
+    if (estatus === 'concluido') {
+      const { rows: ev } = await client.execute({
+        sql: 'SELECT COUNT(*) AS n FROM evidencias WHERE pendiente_id = ?',
+        args: [id],
+      });
+      if (Number(ev[0].n) === 0) {
+        return sendError(res, 'Adjunta al menos una evidencia para concluir.', 422);
+      }
+    }
 
     if (estatus) { campos.push('estatus = ?'); args.push(estatus); }
     if (!campos.length) return sendError(res, 'Nada que actualizar');

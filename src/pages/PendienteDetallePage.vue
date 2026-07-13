@@ -87,6 +87,40 @@
         </ul>
       </div>
 
+      <!-- Evidencias (pasos 5-6): obligatorias para concluir -->
+      <div class="block-title">
+        Evidencias
+        <span v-if="evidencias.length" class="check-progreso">{{ evidencias.length }}</span>
+      </div>
+      <div class="block no-padding-top">
+        <div v-if="!evidencias.length && !subiendo" class="glass evid-vacio">
+          <i class="f7-icons">paperclip</i>
+          <span>Sin evidencias. Adjunta archivos (imágenes o PDF) para poder concluir.</span>
+        </div>
+
+        <div v-if="evidencias.length" class="evid-grid">
+          <div v-for="e in evidencias" :key="e.id" class="glass evid-item">
+            <a :href="e.url" target="_blank" rel="noopener" class="evid-abrir">
+              <img v-if="esImagen(e)" :src="e.url" :alt="e.nombre" class="evid-thumb" />
+              <div v-else class="evid-thumb evid-pdf"><i class="f7-icons">doc_text_fill</i></div>
+            </a>
+            <div class="evid-meta">
+              <div class="evid-nombre">{{ e.nombre }}</div>
+              <div class="evid-sub">{{ tamanoLegible(e.tamano) }}<span v-if="e.autor"> · {{ e.autor }}</span></div>
+            </div>
+            <button v-if="p && puedeVer(p, store.usuario)" type="button" class="evid-del" @click="quitarEvidencia(e)">
+              <i class="f7-icons">trash</i>
+            </button>
+          </div>
+        </div>
+
+        <input ref="fileInput" type="file" accept="image/*,application/pdf" class="oculto" @change="onArchivo" />
+        <f7-button class="glass-btn margin-top" :disabled="subiendo" @click="elegirArchivo">
+          <i class="f7-icons" style="font-size:18px;margin-right:6px;">paperclip</i>
+          {{ subiendo ? 'Subiendo…' : 'Adjuntar evidencia' }}
+        </f7-button>
+      </div>
+
       <!-- Historial / trazabilidad (paso 8) -->
       <div class="block-title">Historial</div>
       <div class="timeline">
@@ -116,8 +150,9 @@ import { api } from '@/js/api.js';
 import { store, refrescar } from '@/js/store.js';
 import {
   estatusColor, etiquetaEstatus, formatFecha, horaLocal,
-  accionesDisponibles, motivoSinAcciones, puedeEditar, puedeEliminar,
+  accionesDisponibles, motivoSinAcciones, puedeEditar, puedeEliminar, puedeVer,
 } from '@/js/pendientes.js';
+import { subirEvidencia, validarArchivo, esImagen, tamanoLegible } from '@/js/evidencias.js';
 
 const props = defineProps({ f7route: Object, f7router: Object });
 const id = props.f7route.params.id;
@@ -128,7 +163,10 @@ const error = ref('');
 const p = ref(null);
 const historial = ref([]);
 const checklist = ref([]);
+const evidencias = ref([]);
 const nuevoItem = ref('');
+const subiendo = ref(false);
+const fileInput = ref(null);
 const eliminado = ref(false); // evita recargar un pendiente ya borrado
 
 const acciones = computed(() => accionesDisponibles(p.value, store.usuario));
@@ -144,6 +182,7 @@ async function cargar() {
     p.value = data.pendiente;
     historial.value = data.historial ?? [];
     checklist.value = data.checklist ?? [];
+    evidencias.value = data.evidencias ?? [];
   } catch (e) {
     error.value = e.message || 'Error de red';
   } finally {
@@ -157,6 +196,10 @@ function ejecutar(a) {
   if (a.tipo === 'reagendar') return abrirReagendar();
   if (a.id === 'aprobar') return aprobar();
   if (a.id === 'devolver') return devolver();
+  // Paso 5: no se concluye sin evidencia (el servidor también lo exige).
+  if (a.estatus === 'concluido' && !evidencias.value.length) {
+    return f7.dialog.alert('Adjunta al menos una evidencia antes de concluir.', 'Falta evidencia');
+  }
   return patch({ estatus: a.estatus });
 }
 
@@ -218,6 +261,40 @@ function devolver() {
   f7.dialog.prompt('¿Qué falta corregir?', 'Devolver a revisión', (motivo) => {
     if (!motivo?.trim()) return;
     patch({ estatus: 'en_progreso', detalle: `devuelto: ${motivo.trim()}` });
+  });
+}
+
+/* -------------------- Evidencias -------------------- */
+function elegirArchivo() { fileInput.value?.click(); }
+
+async function onArchivo(e) {
+  const file = e.target.files?.[0];
+  e.target.value = ''; // permite re-elegir el mismo archivo
+  if (!file) return;
+  const err = validarArchivo(file);
+  if (err) return f7.dialog.alert(err, 'Evidencia');
+  subiendo.value = true;
+  try {
+    const ev = await subirEvidencia(Number(id), file);
+    evidencias.value.unshift(ev);
+    refrescar(); // el historial cambió
+    f7.toast.create({ text: 'Evidencia adjunta ✓', closeTimeout: 1600, position: 'center' }).open();
+  } catch (e2) {
+    f7.dialog.alert(e2.message || 'No se pudo subir el archivo.', 'Evidencia');
+  } finally {
+    subiendo.value = false;
+  }
+}
+
+function quitarEvidencia(ev) {
+  f7.dialog.confirm(`¿Quitar «${ev.nombre}»?`, 'Evidencia', async () => {
+    try {
+      await api.evidencias.remove(ev.id);
+      evidencias.value = evidencias.value.filter((x) => x.id !== ev.id);
+      refrescar();
+    } catch (e) {
+      f7.dialog.alert(e.message || 'No se pudo quitar.', 'Error');
+    }
   });
 }
 
@@ -285,6 +362,30 @@ watch(() => store.tick, cargar);
 .timeline-item-content.glass { border-radius: 14px; }
 .tachado { text-decoration: line-through; opacity: 0.5; }
 .check-progreso { float: right; font-size: 13px; font-weight: 700; color: var(--inova-primary); }
+
+.no-padding-top { padding-top: 0; }
+.oculto { display: none; }
+.evid-vacio {
+  border-radius: 16px; padding: 14px; display: flex; gap: 10px; align-items: center;
+  font-size: 13px; opacity: 0.8;
+}
+.evid-vacio i { font-size: 20px; color: var(--st-hoy); flex-shrink: 0; }
+.evid-grid { display: flex; flex-direction: column; gap: 10px; }
+.evid-item { border-radius: 14px; padding: 8px; display: flex; align-items: center; gap: 12px; }
+.evid-abrir { flex-shrink: 0; }
+.evid-thumb {
+  width: 52px; height: 52px; border-radius: 10px; object-fit: cover; display: block; background: rgba(0,0,0,0.05);
+}
+.evid-pdf { display: flex; align-items: center; justify-content: center; }
+.evid-pdf i { font-size: 26px; color: var(--st-vencido); }
+.evid-meta { flex: 1; min-width: 0; }
+.evid-nombre { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evid-sub { font-size: 12px; opacity: 0.55; margin-top: 2px; }
+.evid-del {
+  border: none; background: transparent; cursor: pointer; padding: 8px; flex-shrink: 0;
+  color: var(--st-vencido); opacity: 0.7;
+}
+.evid-del i { font-size: 20px; }
 .error-card { border-radius: 18px; padding: 16px; display: flex; gap: 12px; align-items: center; }
 .error-card i { font-size: 28px; color: var(--st-vencido); }
 .error-sub { font-size: 13px; opacity: 0.7; margin-top: 2px; }

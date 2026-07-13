@@ -2,7 +2,7 @@
   <div class="login-pantalla">
     <div class="login-caja glass-strong">
       <img src="/icons/icon-192.png" alt="" class="login-logo" />
-      <h1 class="login-titulo">INOVATECH OS</h1>
+      <h1 class="login-titulo">InovaOS</h1>
       <p class="login-sub">Tu operación, bajo control.</p>
 
       <!-- Paso 1: correo -->
@@ -34,12 +34,12 @@
         </template>
 
         <p class="login-nota">
-          Sólo pueden entrar los correos dados de alta. Te enviaremos un código de 6 dígitos.
+          Te enviaremos un código de 6 dígitos. Si es tu primera vez, crearás tu cuenta.
         </p>
       </template>
 
       <!-- Paso 2: código -->
-      <template v-else>
+      <template v-else-if="paso === 'codigo'">
         <p class="login-enviado">
           Enviamos un código a<br /><strong>{{ email }}</strong>
         </p>
@@ -72,6 +72,26 @@
         </div>
       </template>
 
+      <!-- Paso 3: nombre (solo cuentas nuevas) -->
+      <template v-else>
+        <p class="login-enviado">¡Correo verificado! 🎉<br />¿Cómo te llamas?</p>
+        <div class="campo">
+          <label>Nombre completo</label>
+          <input
+            ref="inputNombre"
+            type="text"
+            autocapitalize="words"
+            autocomplete="name"
+            v-model="nombre"
+            placeholder="Tu nombre"
+            @keyup.enter="registrar"
+          />
+        </div>
+        <f7-button large fill :disabled="nombre.trim().length < 2 || cargando" @click="registrar">
+          {{ cargando ? 'Creando cuenta…' : 'Crear cuenta y entrar' }}
+        </f7-button>
+      </template>
+
       <div v-if="error" class="login-error">
         <i class="f7-icons">exclamationmark_circle_fill</i><span>{{ error }}</span>
       </div>
@@ -88,12 +108,15 @@ import { tieneFaceId, entrarConPasskey } from '@/js/passkey.js';
 const paso = ref('email');
 const email = ref(ultimoEmail());
 const codigo = ref('');
+const nombre = ref('');
+const tokenRegistro = ref('');
 const cargando = ref(false);
 const error = ref('');
 const segundos = ref(0);
 const hayFaceId = ref(false);
 const inputEmail = ref(null);
 const inputCodigo = ref(null);
+const inputNombre = ref(null);
 let cronometro = null;
 
 const emailValido = computed(() => /^\S+@\S+\.\S+$/.test(email.value.trim()));
@@ -142,11 +165,33 @@ async function verificar() {
   cargando.value = true;
   error.value = '';
   try {
-    const { usuario } = await api.auth.verificarCodigo(email.value.trim(), codigo.value);
-    setSesion(usuario);
+    const r = await api.auth.verificarCodigo(email.value.trim(), codigo.value);
+    if (r.registro) {
+      // Correo nuevo: pasamos a capturar el nombre.
+      tokenRegistro.value = r.token;
+      paso.value = 'nombre';
+      await nextTick();
+      inputNombre.value?.focus();
+    } else {
+      setSesion(r.usuario);
+    }
   } catch (e) {
     error.value = e.message;
     codigo.value = '';
+  } finally {
+    cargando.value = false;
+  }
+}
+
+async function registrar() {
+  if (nombre.value.trim().length < 2 || cargando.value) return;
+  cargando.value = true;
+  error.value = '';
+  try {
+    const { usuario } = await api.auth.registrar(tokenRegistro.value, nombre.value.trim());
+    setSesion(usuario);
+  } catch (e) {
+    error.value = e.message;
   } finally {
     cargando.value = false;
   }
