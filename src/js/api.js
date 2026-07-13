@@ -60,6 +60,7 @@ export const api = {
     list: (pendienteId) => request(`/checklist?pendiente_id=${pendienteId}`),
     create: (body) => request('/checklist', { method: 'POST', body }),
     toggle: (itemId, completado) => request(`/checklist?item=${itemId}`, { method: 'PATCH', body: { completado } }),
+    update: (itemId, body) => request(`/checklist?item=${itemId}`, { method: 'PATCH', body }),
     remove: (itemId) => request(`/checklist?item=${itemId}`, { method: 'DELETE' }),
   },
   evidencias: {

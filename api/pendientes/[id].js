@@ -31,8 +31,14 @@ export default async function handler(req, res) {
       args: [id],
     });
     if (!rows.length) return sendError(res, 'No encontrado', 404);
-    // Sólo el creador o el responsable pueden abrirlo (404 para no filtrar existencia).
-    if (!puedeVer(rows[0], sesion)) return sendError(res, 'No encontrado', 404);
+    // Lo abre el creador, el responsable, o alguien etiquetado en su checklist.
+    if (!puedeVer(rows[0], sesion)) {
+      const { rows: tag } = await client.execute({
+        sql: 'SELECT 1 FROM checklist WHERE pendiente_id = ? AND asignado_a = ? LIMIT 1',
+        args: [id, sesion.id],
+      });
+      if (!tag.length) return sendError(res, 'No encontrado', 404);
+    }
 
     // created_at viene en UTC ('YYYY-MM-DD HH:MM:SS'); el cliente lo pasa a hora local.
     const { rows: historial } = await client.execute({
@@ -41,7 +47,9 @@ export default async function handler(req, res) {
       args: [id],
     });
     const { rows: checklist } = await client.execute({
-      sql: 'SELECT * FROM checklist WHERE pendiente_id = ? ORDER BY orden, id',
+      sql: `SELECT c.*, u.nombre AS asignado_nombre FROM checklist c
+            LEFT JOIN usuarios u ON u.id = c.asignado_a
+            WHERE c.pendiente_id = ? ORDER BY c.orden, c.id`,
       args: [id],
     });
     const { rows: evidencias } = await client.execute({

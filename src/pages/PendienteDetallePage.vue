@@ -66,21 +66,56 @@
         Checklist
         <span v-if="checklist.length" class="check-progreso">{{ hechos }}/{{ checklist.length }}</span>
       </div>
-      <div class="list glass-list no-hairlines">
+      <div class="list glass-list no-hairlines checklist-list">
         <ul>
           <li v-for="item in checklist" :key="item.id">
-            <label class="item-checkbox item-content">
-              <input type="checkbox" :checked="!!item.completado" @change="toggleItem(item, $event.target.checked)" />
-              <i class="icon icon-checkbox"></i>
-              <div class="item-inner">
-                <div class="item-title" :class="{ tachado: item.completado }">{{ item.texto }}</div>
+            <!-- Modo edición -->
+            <div v-if="editandoId === item.id" class="chk-edit">
+              <input class="chk-edit-input" type="text" v-model="editTexto"
+                     @input="onInput('edit', $event.target.value)"
+                     @keyup.enter="guardarEdicion(item)" placeholder="Editar paso… (usa @ para etiquetar)" />
+              <div v-if="editAsignado" class="chk-chip">@{{ nombrePorId(editAsignado) }}
+                <span class="chk-x" @click="editAsignado = null">✕</span></div>
+              <div v-if="mencionCtx === 'edit' && sugerencias.length" class="chk-menciones">
+                <button v-for="u in sugerencias" :key="u.id" type="button" class="chk-mencion" @click="elegirMencion(u)">
+                  <span class="chk-ini">{{ inicial(u.nombre) }}</span> {{ u.nombre }}
+                </button>
               </div>
-            </label>
+              <div class="chk-edit-actions">
+                <button type="button" class="chk-btn cancel" @click="cancelarEdicion">Cancelar</button>
+                <button type="button" class="chk-btn save" @click="guardarEdicion(item)">Guardar</button>
+              </div>
+            </div>
+
+            <!-- Modo lectura -->
+            <div v-else class="chk-item item-content">
+              <label class="chk-check">
+                <input type="checkbox" :checked="!!item.completado" :disabled="!puedeToggle(item)"
+                       @change="toggleItem(item, $event.target.checked)" />
+                <i class="icon icon-checkbox"></i>
+              </label>
+              <div class="chk-body">
+                <div class="item-title" :class="{ tachado: item.completado }">{{ item.texto }}</div>
+                <span v-if="item.asignado_nombre" class="chk-tag"><i class="f7-icons">at</i>{{ item.asignado_nombre }}</span>
+              </div>
+              <div v-if="puedeEditarChecklist" class="chk-row-actions">
+                <button type="button" class="chk-mini" @click="empezarEdicion(item)"><i class="f7-icons">pencil</i></button>
+                <button type="button" class="chk-mini" @click="borrarItem(item)"><i class="f7-icons">trash</i></button>
+              </div>
+            </div>
           </li>
-          <li class="item-content item-input">
-            <div class="item-inner">
-              <div class="item-input-wrap">
-                <input type="text" v-model="nuevoItem" placeholder="Añadir paso…" @keyup.enter="agregarItem" />
+
+          <!-- Añadir -->
+          <li v-if="puedeEditarChecklist" class="item-content item-input chk-add-li">
+            <div class="chk-add">
+              <input type="text" v-model="nuevoItem" placeholder="Añadir paso… (usa @ para etiquetar)"
+                     @input="onInput('nuevo', $event.target.value)" @keyup.enter="agregarItem" />
+              <span v-if="nuevoAsignado" class="chk-chip">@{{ nombrePorId(nuevoAsignado) }}
+                <span class="chk-x" @click="nuevoAsignado = null">✕</span></span>
+              <div v-if="mencionCtx === 'nuevo' && sugerencias.length" class="chk-menciones">
+                <button v-for="u in sugerencias" :key="u.id" type="button" class="chk-mencion" @click="elegirMencion(u)">
+                  <span class="chk-ini">{{ inicial(u.nombre) }}</span> {{ u.nombre }}
+                </button>
               </div>
             </div>
           </li>
@@ -165,6 +200,13 @@ const historial = ref([]);
 const checklist = ref([]);
 const evidencias = ref([]);
 const nuevoItem = ref('');
+const usuarios = ref([]);
+const nuevoAsignado = ref(null);
+const editandoId = ref(null);
+const editTexto = ref('');
+const editAsignado = ref(null);
+const mencionCtx = ref(null); // 'nuevo' | 'edit' | null
+const mencionQuery = ref('');
 const subiendo = ref(false);
 const fileInput = ref(null);
 const eliminado = ref(false); // evita recargar un pendiente ya borrado
@@ -172,6 +214,74 @@ const eliminado = ref(false); // evita recargar un pendiente ya borrado
 const acciones = computed(() => accionesDisponibles(p.value, store.usuario));
 const hechos = computed(() => checklist.value.filter((i) => i.completado).length);
 const hoy = new Date().toISOString().slice(0, 10);
+
+// Sólo el creador o el responsable editan el checklist; el etiquetado sólo
+// puede marcar SU paso como completado.
+const puedeEditarChecklist = computed(() => {
+  const u = store.usuario, pp = p.value;
+  if (!u || !pp) return false;
+  return Number(pp.creado_por) === Number(u.id) || Number(pp.responsable_id) === Number(u.id);
+});
+function puedeToggle(item) {
+  return puedeEditarChecklist.value || Number(item.asignado_a) === Number(store.usuario?.id);
+}
+
+const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const inicial = (n) => (n || '?').trim().charAt(0).toUpperCase();
+const nombrePorId = (id) => usuarios.value.find((u) => Number(u.id) === Number(id))?.nombre || '';
+
+// Sugerencias de @mención (excluye a uno mismo).
+const sugerencias = computed(() => {
+  if (!mencionCtx.value) return [];
+  const q = norm(mencionQuery.value);
+  const yo = Number(store.usuario?.id);
+  return usuarios.value.filter((u) => Number(u.id) !== yo && norm(u.nombre).includes(q)).slice(0, 6);
+});
+
+// Detecta un "@palabra" al final del texto para abrir el selector.
+function onInput(ctx, valor) {
+  const m = valor.match(/@([\p{L}]*)$/u);
+  if (m) { mencionCtx.value = ctx; mencionQuery.value = m[1]; }
+  else { mencionCtx.value = null; mencionQuery.value = ''; }
+}
+function elegirMencion(u) {
+  const limpiar = (t) => t.replace(/@[\p{L}]*$/u, '').replace(/\s+$/, '');
+  if (mencionCtx.value === 'nuevo') { nuevoItem.value = limpiar(nuevoItem.value); nuevoAsignado.value = u.id; }
+  else { editTexto.value = limpiar(editTexto.value); editAsignado.value = u.id; }
+  mencionCtx.value = null; mencionQuery.value = '';
+}
+
+function empezarEdicion(item) {
+  editandoId.value = item.id;
+  editTexto.value = item.texto;
+  editAsignado.value = item.asignado_a || null;
+  mencionCtx.value = null;
+}
+function cancelarEdicion() {
+  editandoId.value = null;
+  mencionCtx.value = null;
+}
+async function guardarEdicion(item) {
+  const texto = editTexto.value.trim();
+  if (!texto) return;
+  try {
+    const upd = await api.checklist.update(item.id, { texto, asignado_a: editAsignado.value });
+    Object.assign(item, upd);
+    cancelarEdicion();
+  } catch (e) {
+    f7.toast.create({ text: e.message || 'No se pudo guardar', closeTimeout: 1800, position: 'center' }).open();
+  }
+}
+function borrarItem(item) {
+  f7.dialog.confirm('¿Borrar este paso del checklist?', async () => {
+    try {
+      await api.checklist.remove(item.id);
+      checklist.value = checklist.value.filter((i) => i.id !== item.id);
+    } catch (e) {
+      f7.toast.create({ text: 'No se pudo borrar', closeTimeout: 1800, position: 'center' }).open();
+    }
+  });
+}
 
 async function cargar() {
   if (eliminado.value) return;
@@ -183,6 +293,7 @@ async function cargar() {
     historial.value = data.historial ?? [];
     checklist.value = data.checklist ?? [];
     evidencias.value = data.evidencias ?? [];
+    if (!usuarios.value.length) usuarios.value = await api.usuarios.list().catch(() => []);
   } catch (e) {
     error.value = e.message || 'Error de red';
   } finally {
@@ -320,9 +431,12 @@ function eliminar() {
 async function agregarItem() {
   const texto = nuevoItem.value.trim();
   if (!texto) return;
+  const asignado = nuevoAsignado.value;
   nuevoItem.value = '';
+  nuevoAsignado.value = null;
+  mencionCtx.value = null;
   try {
-    const item = await api.checklist.create({ pendiente_id: Number(id), texto, orden: checklist.value.length });
+    const item = await api.checklist.create({ pendiente_id: Number(id), texto, orden: checklist.value.length, asignado_a: asignado });
     checklist.value.push(item);
   } catch (e) {
     f7.toast.create({ text: 'No se pudo añadir', closeTimeout: 1800, position: 'center' }).open();
@@ -368,6 +482,61 @@ watch(() => store.tick, cargar);
 .timeline-item-subtitle { font-size: 13px; opacity: 0.6; line-height: 1.35; margin-top: 1px; }
 .tachado { text-decoration: line-through; opacity: 0.5; }
 .check-progreso { float: right; font-size: 13px; font-weight: 700; color: var(--inova-primary); }
+
+/* Checklist mejorado */
+.chk-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+.chk-check { display: flex; align-items: center; position: relative; }
+.chk-check input { position: absolute; opacity: 0; width: 22px; height: 22px; }
+.chk-check input:disabled ~ .icon-checkbox { opacity: 0.4; }
+.chk-body { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.chk-body .item-title { flex: 0 1 auto; }
+.tachado { text-decoration: line-through; color: #a5a1b5; }
+.chk-tag {
+  display: inline-flex; align-items: center; gap: 1px; font-size: 12px; font-weight: 700;
+  color: var(--inova-primary); background: rgba(91, 91, 214, 0.1); border-radius: 8px; padding: 2px 8px 2px 5px;
+}
+.chk-tag i { font-size: 13px; }
+.chk-row-actions { flex: 0 0 auto; display: flex; gap: 2px; }
+.chk-mini {
+  width: 30px; height: 30px; border: none; background: transparent; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; color: #8a8699;
+}
+.chk-mini i { font-size: 17px; }
+.chk-mini:active { background: rgba(0, 0, 0, 0.05); }
+
+.chk-edit { padding: 12px 14px; }
+.chk-edit-input, .chk-add input {
+  width: 100%; border: none; background: rgba(120, 120, 128, 0.1); border-radius: 12px;
+  padding: 10px 12px; font-size: 15px; outline: none; color: #1f1a33; font-family: inherit;
+}
+.chk-edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.chk-btn { border: none; border-radius: 12px; padding: 8px 16px; font-size: 14px; font-weight: 700; cursor: pointer; }
+.chk-btn.cancel { background: rgba(120, 120, 128, 0.14); color: #4a4560; }
+.chk-btn.save { background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2)); color: #fff; }
+
+.chk-add-li { display: block; }
+.chk-add { position: relative; padding: 4px 0; }
+.chk-chip {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; font-weight: 700;
+  color: var(--inova-primary); background: rgba(91, 91, 214, 0.12); border-radius: 10px; padding: 5px 10px;
+}
+.chk-x { cursor: pointer; font-size: 12px; opacity: 0.7; }
+
+.chk-menciones {
+  margin-top: 6px; background: #fff; border-radius: 14px; overflow: hidden;
+  box-shadow: 0 8px 24px rgba(17, 12, 46, 0.16); border: 1px solid rgba(0, 0, 0, 0.05);
+}
+.chk-mencion {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: none;
+  background: transparent; padding: 10px 12px; font-size: 14px; color: #1f1a33; cursor: pointer;
+}
+.chk-mencion:not(:last-child) { border-bottom: 1px solid rgba(0, 0, 0, 0.05); }
+.chk-mencion:active { background: rgba(91, 91, 214, 0.08); }
+.chk-ini {
+  width: 26px; height: 26px; border-radius: 50%; flex: 0 0 auto; font-size: 12px; font-weight: 700; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
+}
 
 .no-padding-top { padding-top: 0; }
 .oculto { display: none; }
