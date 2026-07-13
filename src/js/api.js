@@ -54,6 +54,7 @@ export const api = {
   },
   tablero: {
     resumen: () => request('/tablero'),
+    metricas: () => request('/tablero?metricas=1'),
   },
   checklist: {
     list: (pendienteId) => request(`/checklist?pendiente_id=${pendienteId}`),

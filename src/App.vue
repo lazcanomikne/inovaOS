@@ -11,6 +11,7 @@
       <f7-views tabs class="safe-areas">
         <f7-view id="view-home" main tab tab-active url="/" />
         <f7-view id="view-pendientes" tab url="/pendientes/" />
+        <f7-view id="view-metricas" tab url="/metricas/" />
         <f7-view id="view-captura" tab url="/captura/" />
         <f7-view id="view-tablero" tab url="/tablero/" />
         <f7-view id="view-asistente" tab url="/asistente/" />
@@ -56,9 +57,11 @@ const f7params = reactive({
   touch: { tapHold: true },
 });
 
+// 7 ítems con "Crear" siempre al centro (índice 3: 3 a cada lado).
 const tabs = [
   { id: 'home', label: 'Inicio', icon: 'house_fill' },
-  { id: 'pendientes', label: 'Pendientes', icon: 'square_list_fill' },
+  { id: 'pendientes', label: 'Tareas', icon: 'square_list_fill' },
+  { id: 'metricas', label: 'Métricas', icon: 'chart_bar_alt_fill' },
   { id: 'captura', label: 'Crear', icon: 'plus' },
   { id: 'tablero', label: 'Tablero', icon: 'chart_pie_fill' },
   { id: 'asistente', label: 'IA', icon: 'sparkles' },
