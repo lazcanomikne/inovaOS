@@ -1,12 +1,16 @@
 <template>
-  <f7-page name="asistente" class="asistente-page">
+  <f7-page name="asistente" class="asistente-page" :page-content="false">
     <f7-navbar>
+      <f7-nav-left>
+        <a class="link icon-only atras-btn" @click="volver"><i class="f7-icons">chevron_left</i></a>
+      </f7-nav-left>
       <f7-nav-title>
         <span class="asis-title"><i class="f7-icons">sparkles</i> Asistente</span>
       </f7-nav-title>
     </f7-navbar>
 
-    <div class="chat-msgs" ref="scroller">
+    <!-- Mensajes -->
+    <div class="chat-msgs" ref="scroller" :style="{ bottom: (kb + 78) + 'px' }">
       <!-- Bienvenida -->
       <div v-if="!mensajes.length" class="chat-welcome">
         <div class="cw-orb"><i class="f7-icons">sparkles</i></div>
@@ -18,12 +22,7 @@
       </div>
 
       <!-- Conversación -->
-      <div
-        v-for="(m, i) in mensajes"
-        :key="i"
-        class="bubble-row"
-        :class="m.rol"
-      >
+      <div v-for="(m, i) in mensajes" :key="i" class="bubble-row" :class="m.rol">
         <div class="bubble" :class="m.rol">{{ m.texto }}</div>
       </div>
 
@@ -33,14 +32,15 @@
       </div>
     </div>
 
-    <!-- Compositor -->
-    <div class="chat-composer">
+    <!-- Compositor — se pega justo encima del teclado -->
+    <div class="chat-composer" :style="kb ? { bottom: kb + 'px' } : {}">
       <textarea
         ref="entrada"
         v-model="texto"
         rows="1"
         placeholder="Escribe tu pregunta…"
         :disabled="pensando"
+        @focus="alFondo"
         @keydown.enter.exact.prevent="enviar()"
         @input="autosize"
       ></textarea>
@@ -52,7 +52,8 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
 import { store } from '@/js/store.js';
 
@@ -69,6 +70,20 @@ const texto = ref('');
 const pensando = ref(false);
 const scroller = ref(null);
 const entrada = ref(null);
+const kb = ref(0); // alto del teclado en px (0 si está cerrado)
+
+function volver() {
+  f7.tab.show('#view-home');
+}
+
+// Sigue al teclado con la API de visualViewport (como iMessage/WhatsApp).
+function alTeclado() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const alto = window.innerHeight - vv.height - vv.offsetTop;
+  kb.value = Math.max(0, Math.round(alto));
+  alFondo();
+}
 
 function autosize() {
   const el = entrada.value;
@@ -102,20 +117,36 @@ async function enviar(preset) {
     alFondo();
   }
 }
+
+onMounted(() => {
+  const vv = window.visualViewport;
+  if (vv) {
+    vv.addEventListener('resize', alTeclado);
+    vv.addEventListener('scroll', alTeclado);
+  }
+});
+onBeforeUnmount(() => {
+  const vv = window.visualViewport;
+  if (vv) {
+    vv.removeEventListener('resize', alTeclado);
+    vv.removeEventListener('scroll', alTeclado);
+  }
+});
 </script>
 
 <style scoped>
 .asis-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
 .asis-title i { font-size: 18px; color: var(--inova-primary); }
+.atras-btn i { font-size: 28px; color: var(--inova-primary); }
 
 .chat-msgs {
   position: absolute;
-  inset: 0;
-  top: 0;
+  top: 0; left: 0; right: 0;
+  /* bottom se ajusta por JS (teclado + alto del compositor) */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: calc(var(--f7-navbar-height, 56px) + env(safe-area-inset-top) + 12px) 14px
-           calc(150px + env(safe-area-inset-bottom));
+  padding: calc(var(--f7-navbar-height, 56px) + env(safe-area-inset-top) + 12px) 14px 8px;
+  transition: bottom 0.18s ease;
 }
 
 /* Bienvenida */
@@ -131,7 +162,7 @@ async function enviar(preset) {
 .chat-welcome p { margin: 0 0 18px; font-size: 14px; color: #6b6780; }
 .cw-chips { display: flex; flex-direction: column; gap: 8px; max-width: 320px; margin: 0 auto; }
 .cw-chip {
-  border: none; background: rgba(255, 255, 255, 0.72); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.72); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.6);
   padding: 12px 16px; border-radius: 14px; font-size: 14px; font-weight: 600; color: #3a3550;
   cursor: pointer; transition: transform 0.1s ease;
@@ -165,19 +196,20 @@ async function enviar(preset) {
 .escribiendo span:nth-child(3) { animation-delay: 0.3s; }
 @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); opacity: 0.5; } 40% { transform: translateY(-5px); opacity: 1; } }
 
-/* Compositor — flota por encima de la pila */
+/* Compositor — pegado al fondo; sube con el teclado (bottom por JS) */
 .chat-composer {
   position: absolute; left: 0; right: 0;
-  bottom: calc(80px + env(safe-area-inset-bottom));
+  bottom: calc(10px + env(safe-area-inset-bottom));
   margin: 0 14px; padding: 6px 6px 6px 14px;
   display: flex; align-items: flex-end; gap: 8px;
-  background: rgba(255, 255, 255, 0.78); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
+  background: rgba(255, 255, 255, 0.82); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.6); border-radius: 24px;
   box-shadow: 0 8px 26px rgba(17, 12, 46, 0.16);
+  transition: bottom 0.18s ease;
 }
 .chat-composer textarea {
   flex: 1; border: none; background: transparent; resize: none; outline: none;
-  font-size: 15px; line-height: 1.35; max-height: 120px; padding: 8px 0; color: #1f1a33; font-family: inherit;
+  font-size: 16px; line-height: 1.35; max-height: 120px; padding: 8px 0; color: #1f1a33; font-family: inherit;
 }
 .enviar-btn {
   flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer;

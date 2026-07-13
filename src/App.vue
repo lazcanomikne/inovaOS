@@ -17,9 +17,10 @@
         <f7-view id="view-perfil" tab url="/perfil/" />
       </f7-views>
 
-      <!-- Pastilla flotante (glass) — en <body> para que quede sobre todo -->
+      <!-- Pastilla flotante (glass) — en <body> para que quede sobre todo.
+           Se oculta en el chat de IA para dar una vista de conversación completa. -->
       <Teleport to="body">
-        <nav class="floating-nav">
+        <nav class="floating-nav" v-show="active !== 'asistente'">
           <button
             v-for="t in tabs"
             :key="t.id"
