@@ -100,11 +100,11 @@
             </div>
           </a>
         </li>
-        <li class="item-content item-input">
+        <li class="item-content item-input fecha-li">
           <div class="item-inner">
-            <div class="item-title item-label">Fecha compromiso</div>
+            <div class="item-title item-label fecha-label"><i class="f7-icons">calendar</i> Fecha compromiso</div>
             <div class="item-input-wrap">
-              <input type="date" v-model="form.fecha_compromiso" :min="hoy" />
+              <input ref="fechaInput" class="fecha-input" type="date" v-model="form.fecha_compromiso" :min="hoy" />
             </div>
           </div>
         </li>
@@ -280,7 +280,38 @@ function pickPrioridad() {
     .open();
 }
 
-async function delegar() {
+const fechaInput = ref(null);
+const hoyLegible = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' });
+
+function enfocarFecha() {
+  const el = fechaInput.value;
+  if (!el) return;
+  el.focus();
+  if (el.showPicker) { try { el.showPicker(); } catch (e) { /* requiere gesto; el focus basta */ } }
+}
+
+// La fecha de compromiso importa: si no la pusieron, la pedimos antes de guardar.
+function delegar() {
+  if (!form.value.titulo.trim() || saving.value) return;
+  if (!form.value.fecha_compromiso) {
+    f7.dialog
+      .create({
+        title: 'Fecha de compromiso',
+        text: '¿Para cuándo debe estar listo este pendiente?',
+        buttons: [
+          { text: `Usar hoy (${hoyLegible})`, bold: true, onClick: () => { form.value.fecha_compromiso = hoy; guardar(); } },
+          { text: 'Indicar otra fecha', onClick: () => enfocarFecha() },
+          { text: 'Guardar sin fecha', color: 'gray', onClick: () => guardar() },
+        ],
+        verticalButtons: true,
+      })
+      .open();
+    return;
+  }
+  guardar();
+}
+
+async function guardar() {
   saving.value = true;
   try {
     await api.pendientes.create({
@@ -345,6 +376,15 @@ onMounted(cargarUsuarios);
   color: #fff; border-color: transparent; box-shadow: 0 6px 16px rgba(91, 91, 214, 0.35);
 }
 .para-mi-hint { font-size: 12px; color: #8a8699; }
+
+/* Fecha de compromiso destacada (es importante) */
+.fecha-label { display: inline-flex; align-items: center; gap: 6px; font-size: 15px !important; font-weight: 700 !important; color: #2a2540 !important; }
+.fecha-label i { font-size: 17px; color: var(--inova-primary); }
+.fecha-input {
+  font-size: 19px !important; font-weight: 700 !important; color: var(--inova-primary) !important;
+  width: 100%; height: 46px; padding: 6px 10px !important; border: 1.5px solid rgba(91, 91, 214, 0.3) !important;
+  border-radius: 12px; background: rgba(91, 91, 214, 0.06); font-family: inherit;
+}
 
 /* ---- Panel de dictado ---- */
 .voz-panel {

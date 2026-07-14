@@ -188,6 +188,7 @@ import {
   accionesDisponibles, motivoSinAcciones, puedeEditar, puedeEliminar, puedeVer,
 } from '@/js/pendientes.js';
 import { subirEvidencia, validarArchivo, esImagen, tamanoLegible } from '@/js/evidencias.js';
+import { celebrar } from '@/js/celebracion.js';
 
 const props = defineProps({ f7route: Object, f7router: Object });
 const id = props.f7route.params.id;
@@ -325,7 +326,10 @@ async function patch(cambios) {
     // refrescar() dispara el watch de store.tick, que recarga esta página
     // (historial + estatus) y también Inicio/Lista/Tablero. Una sola petición.
     refrescar();
-    if (cambios.estatus) {
+    if (cambios.estatus === 'concluido' || cambios.estatus === 'aprobado') {
+      // ¡Se cerró! Confeti, "ka-ching" y "¡Excelente!".
+      celebrar('¡Excelente!');
+    } else if (cambios.estatus) {
       f7.toast.create({ text: `Estatus: ${etiquetaEstatus(cambios.estatus)}`, closeTimeout: 1800, position: 'center' }).open();
     }
   } catch (e) {
