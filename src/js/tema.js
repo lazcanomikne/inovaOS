@@ -8,7 +8,7 @@ export const TEMATICAS = [
   { id: 'ninguna', nombre: 'Sin temática', emoji: '🚫' },
   { id: 'perritos', nombre: 'Perritos', emoji: '🐶' },
   { id: 'computo', nombre: 'Equipo de cómputo', emoji: '💻' },
-  { id: 'mundial', nombre: 'Copa del Mundo 2026', emoji: '⚽' },
+  { id: 'mundial', nombre: 'Fútbol', emoji: '⚽' },
   { id: 'f1', nombre: 'Fórmula 1', emoji: '🏁' },
 ];
 

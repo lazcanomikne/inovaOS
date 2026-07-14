@@ -98,18 +98,17 @@
 
     <!-- Temática (figuras de fondo) -->
     <div class="block-title">Temática</div>
-    <div class="tema-grid">
+    <div class="color-row">
       <button
         v-for="t in TEMATICAS"
         :key="t.id"
         type="button"
-        class="tema-card"
+        class="tema-chip"
         :class="{ activo: tematicaId === t.id }"
         @click="elegirTematica(t.id)"
       >
-        <span class="tema-emoji-grande">{{ t.emoji }}</span>
-        <span class="tema-nombre">{{ t.nombre }}</span>
-        <i v-if="tematicaId === t.id" class="f7-icons tema-check">checkmark_circle_fill</i>
+        <span class="tema-circulo">{{ t.emoji }}</span>
+        <span class="color-nombre">{{ t.nombre }}</span>
       </button>
     </div>
 
@@ -364,16 +363,19 @@ onMounted(async () => {
 }
 .tema-card:active { transform: scale(0.97); }
 .tema-card.activo { border-color: var(--inova-primary); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08); }
-.tema-emoji-grande { font-size: 36px; line-height: 1; }
-.tema-nombre { font-size: 13px; font-weight: 700; color: #2a2540; text-align: center; }
-.tema-check { position: absolute; top: 8px; right: 8px; font-size: 20px; color: var(--inova-primary); }
-
-/* Selector de color */
+/* Selectores en fila de círculos (temática y color) */
 .color-row { display: flex; gap: 12px; overflow-x: auto; padding: 4px 16px 8px; -webkit-overflow-scrolling: touch; }
-.color-chip {
+.color-chip, .tema-chip {
   flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px;
-  border: none; background: transparent; cursor: pointer; padding: 0; width: 58px;
+  border: none; background: transparent; cursor: pointer; padding: 0; width: 64px;
 }
+.tema-circulo {
+  width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 25px; background: rgba(120, 120, 128, 0.12); border: 2px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1); transition: transform 0.12s ease;
+}
+.tema-chip.activo .tema-circulo { transform: scale(1.08); outline: 2.5px solid var(--inova-primary); outline-offset: 2px; background: rgba(var(--f7-theme-color-rgb), 0.14); }
+.tema-chip:active .tema-circulo { transform: scale(0.94); }
 .color-muestra {
   width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18); border: 2px solid rgba(255, 255, 255, 0.7); transition: transform 0.12s ease;
@@ -382,6 +384,7 @@ onMounted(async () => {
 .color-chip.activo .color-muestra { transform: scale(1.08); outline: 2.5px solid var(--inova-primary); outline-offset: 2px; }
 .color-chip:active .color-muestra { transform: scale(0.94); }
 .color-nombre { font-size: 11px; font-weight: 600; color: #6b6780; white-space: nowrap; }
+.tema-chip .color-nombre { white-space: normal; line-height: 1.15; text-align: center; }
 .perfil-nombre { font-size: 20px; font-weight: 800; }
 .perfil-rol { opacity: 0.7; font-size: 14px; }
 .perfil-email { opacity: 0.45; font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; }
