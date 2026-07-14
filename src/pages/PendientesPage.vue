@@ -76,7 +76,7 @@
           <div class="item-content">
             <div class="item-inner vacio">
               <span class="text-color-gray">{{ mensajeVacio }}</span>
-              <a v-if="filtro !== 'todos' || relacion !== 'todas'" class="link" @click="limpiarFiltros">Ver todos</a>
+              <a v-if="filtro !== 'inmediata' || relacion !== 'todas'" class="link" @click="limpiarFiltros">Restablecer</a>
             </div>
           </div>
         </li>
@@ -90,7 +90,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
 import { store, setFiltro, refrescar } from '@/js/store.js';
-import { estatusColor, etiquetaEstatus, formatFecha, CERRADOS, relacionCon } from '@/js/pendientes.js';
+import { estatusColor, etiquetaEstatus, formatFecha, relacionCon, CATEGORIAS, enCategoria } from '@/js/pendientes.js';
 
 const props = defineProps({ f7router: Object });
 const loading = ref(true);
@@ -130,24 +130,11 @@ const filtro = computed({
   set: (v) => setFiltro(v),
 });
 
-// Mismas claves que el semáforo de Inicio, para que al tocar una tarjeta
-// la lista muestre exactamente ese grupo.
-const filtros = [
-  { key: 'todos', label: 'Todos' },
-  { key: 'vencido', label: 'Vencidos' },
-  { key: 'hoy', label: 'Vencen hoy' },
-  { key: 'manana', label: 'Vencen mañana' },
-  { key: 'tiempo', label: 'En tiempo' },
-  { key: 'espera', label: 'En espera' },
-  { key: 'concluido', label: 'Concluidos' },
-  { key: 'archivados', label: 'Archivados' },
-];
+// Categorías: Atención inmediata, Vencidos, Hoy, Próximos 7 días, En espera,
+// Sin fecha, Concluidos, Archivados. La regla vive en pendientes.js (enCategoria).
+const filtros = CATEGORIAS;
 
-function coincide(p, key) {
-  if (key === 'todos') return true;
-  if (key === 'concluido') return CERRADOS.includes(p.estatus);
-  return estatusColor(p) === key;
-}
+const coincide = (p, key) => enCategoria(p, key, store.usuario);
 
 // Primero acotamos por relación, luego por estatus (los conteos de los chips
 // reflejan la relación elegida). En la vista de archivados no se filtra por estatus.
@@ -156,7 +143,6 @@ const filtrados = computed(() =>
   verArchivados.value ? enRelacion.value : enRelacion.value.filter((p) => coincide(p, filtro.value))
 );
 const conteo = (key) => {
-  if (key === 'todos') return 0;
   if (key === 'archivados') return archivados.value.filter(coincideRelacion).length;
   return activos.value.filter(coincideRelacion).filter((p) => coincide(p, key)).length;
 };
@@ -164,14 +150,12 @@ const etiquetaFiltro = computed(() => filtros.find((f) => f.key === filtro.value
 
 const mensajeVacio = computed(() => {
   if (verArchivados.value) return 'No tienes pendientes archivados.';
-  if (filtro.value !== 'todos') return `Nada en «${etiquetaFiltro.value}».`;
-  if (relacion.value === 'mia') return 'No tienes pendientes asignados.';
-  if (relacion.value === 'delegada') return 'No has delegado pendientes.';
-  return 'Aún no hay pendientes.';
+  if (filtro.value === 'inmediata') return 'Nada requiere tu atención inmediata 🎉';
+  return `Nada en «${etiquetaFiltro.value}».`;
 });
 
 function limpiarFiltros() {
-  filtro.value = 'todos';
+  filtro.value = 'inmediata';
   relacion.value = 'todas';
 }
 

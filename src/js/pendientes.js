@@ -13,6 +13,24 @@ export const ETIQUETAS = {
 
 export const CERRADOS = ['concluido', 'aprobado'];
 
+// Áreas disponibles (lista fija para la captura).
+export const AREAS = [
+  'Finanzas', 'Cobranza', 'Cotizaciones', 'Seguimiento a cotizaciones',
+  'Operación', 'Proyectos', 'Gestión', 'Administración',
+];
+
+// Categorías de la lista de pendientes (debajo de Todas / Para mí / Yo delegué).
+export const CATEGORIAS = [
+  { key: 'inmediata', label: 'Atención inmediata' },
+  { key: 'vencidos', label: 'Vencidos' },
+  { key: 'hoy', label: 'Hoy' },
+  { key: 'proximos', label: 'Próximos 7 días' },
+  { key: 'espera', label: 'En espera' },
+  { key: 'sinfecha', label: 'Sin fecha' },
+  { key: 'concluidos', label: 'Concluidos' },
+  { key: 'archivados', label: 'Archivados' },
+];
+
 export function diasRestantes(fecha) {
   if (!fecha) return null;
   const hoy = new Date();
@@ -149,6 +167,39 @@ export function accionesDisponibles(p, u) {
       break;
   }
   return acciones;
+}
+
+/* --------------- Clasificación en categorías de la lista ---------------
+   La regla sale de lo que el usuario captura (fecha de compromiso, prioridad,
+   responsable) y del estatus. "Activo" = ni concluido/aprobado, ni en espera.
+   Un pendiente puede caer en más de una categoría (los chips son vistas).
+   'archivados' no se evalúa aquí: viene de una fuente de datos aparte.
+------------------------------------------------------------------------- */
+export function enCategoria(p, key, u) {
+  const cerrado = CERRADOS.includes(p.estatus);
+  const enEspera = p.estatus === 'en_espera';
+  const activo = !cerrado && !enEspera;
+  const d = diasRestantes(p.fecha_compromiso); // null si no tiene fecha
+  const vencido = d !== null && d < 0;
+  const esHoy = d === 0;
+  const prox7 = d !== null && d >= 1 && d <= 7;
+  const alta = String(p.prioridad || '').toLowerCase() === 'alta';
+  const esperaMiAceptacion =
+    !!u && Number(p.responsable_id) === Number(u.id) && ['delegado', 'reagendado'].includes(p.estatus);
+
+  switch (key) {
+    // Lo que exige acción tuya YA: vencido, hoy, Alta que vence pronto, o que
+    // esperas aceptar tú.
+    case 'inmediata':
+      return activo && (vencido || esHoy || (alta && d !== null && d <= 2) || esperaMiAceptacion);
+    case 'vencidos': return activo && vencido;
+    case 'hoy': return activo && esHoy;
+    case 'proximos': return activo && prox7;
+    case 'espera': return enEspera;
+    case 'sinfecha': return activo && d === null;
+    case 'concluidos': return cerrado;
+    default: return false;
+  }
 }
 
 // Texto explicativo cuando el usuario no tiene acciones (para no dejar la pantalla muda).

@@ -11,7 +11,7 @@ export const store = reactive({
   usuarios: [],
 
   // Filtro que la lista de Pendientes debe aplicar (lo fija Inicio).
-  filtro: 'todos',
+  filtro: 'inmediata',
 
   // Contador que las pantallas observan para recargar datos.
   tick: 0,
@@ -39,7 +39,7 @@ export function limpiarSesion() {
   store.usuario = null;
   store.autenticado = false;
   store.usuarios = [];
-  store.filtro = 'todos';
+  store.filtro = 'inmediata';
 }
 
 /* Recordamos el último correo para ofrecer Face ID directo la próxima vez.

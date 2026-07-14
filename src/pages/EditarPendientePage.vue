@@ -67,13 +67,15 @@
               </div>
             </a>
           </li>
-          <li class="item-content item-input">
-            <div class="item-inner">
-              <div class="item-title item-label">Área</div>
-              <div class="item-input-wrap">
-                <input type="text" v-model="form.area" placeholder="Ventas, Compras..." />
+          <li>
+            <a class="item-link" @click="pickArea">
+              <div class="item-content">
+                <div class="item-inner">
+                  <div class="item-title">Área</div>
+                  <div class="item-after">{{ form.area || 'Seleccionar' }}</div>
+                </div>
               </div>
-            </div>
+            </a>
           </li>
         </ul>
       </div>
@@ -93,6 +95,7 @@ import { ref, computed, onMounted } from 'vue';
 import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
 import { store, setUsuarios, refrescar } from '@/js/store.js';
+import { AREAS } from '@/js/pendientes.js';
 
 const props = defineProps({ f7route: Object, f7router: Object });
 const id = props.f7route.params.id;
@@ -161,6 +164,18 @@ function pickResponsable() {
     buttons: [
       { text: 'Sin asignar', onClick: () => (form.value.responsable_id = null) },
       ...store.usuarios.map((u) => ({ text: u.nombre, onClick: () => (form.value.responsable_id = u.id) })),
+      { text: 'Cancelar', color: 'gray' },
+    ],
+    verticalButtons: true,
+  }).open();
+}
+
+function pickArea() {
+  f7.dialog.create({
+    title: 'Área',
+    buttons: [
+      { text: 'Sin área', onClick: () => (form.value.area = '') },
+      ...AREAS.map((a) => ({ text: a, onClick: () => (form.value.area = a) })),
       { text: 'Cancelar', color: 'gray' },
     ],
     verticalButtons: true,

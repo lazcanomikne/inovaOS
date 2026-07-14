@@ -69,6 +69,27 @@ export const HERRAMIENTAS = [
     input_schema: { type: 'object', properties: {} },
   },
   {
+    name: 'clasificar_pendientes',
+    description: 'Organiza los pendientes ABIERTOS por categoría con la misma lógica de la app: atención inmediata, vencidos, hoy, próximos 7 días, en espera y sin fecha. Úsala cuando pidan "organiza/reorganiza mis pendientes" o "cómo van".',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'actualizar_pendiente',
+    description: 'Edita campos de un pendiente (fecha de compromiso, prioridad, área, título o descripción). Sirve para reorganizar/actualizar (p. ej. ponerle fecha a los que no tienen, subir prioridad). NO la llames sin confirmar. Sólo quien creó el pendiente puede editarlo.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer' },
+        fecha_compromiso: { type: 'string', description: 'Fecha límite YYYY-MM-DD; cadena vacía para quitarla.' },
+        prioridad: { type: 'string', enum: ['Alta', 'Media', 'Baja'] },
+        area: { type: 'string', enum: ['Finanzas', 'Cobranza', 'Cotizaciones', 'Seguimiento a cotizaciones', 'Operación', 'Proyectos', 'Gestión', 'Administración'] },
+        titulo: { type: 'string' },
+        descripcion: { type: 'string' },
+      },
+      required: ['id'],
+    },
+  },
+  {
     name: 'crear_pendiente',
     description: 'Crea y (opcionalmente) delega un pendiente. NO la llames hasta que el usuario confirme explícitamente los datos. El creador siempre soy yo (el usuario actual).',
     input_schema: {
@@ -188,6 +209,59 @@ export async function ejecutarHerramienta(client, sesion, nombre, input = {}) {
       return { usuarios: rows };
     }
 
+    case 'clasificar_pendientes': {
+      const cond = ["p.estatus NOT IN ('concluido','aprobado')", 'COALESCE(p.archivado,0)=0'];
+      const args = [];
+      if (!esDir(sesion)) { cond.unshift('(p.creado_por = ? OR p.responsable_id = ?)'); args.push(sesion.id, sesion.id); }
+      const { rows } = await client.execute({
+        sql: `SELECT p.*, u.nombre AS responsable_nombre, c.nombre AS creador_nombre
+              FROM pendientes p
+              LEFT JOIN usuarios u ON u.id = p.responsable_id
+              LEFT JOIN usuarios c ON c.id = p.creado_por
+              WHERE ${cond.join(' AND ')}
+              ORDER BY p.fecha_compromiso IS NULL, p.fecha_compromiso ASC LIMIT 100`,
+        args,
+      });
+      const grupos = { atencion_inmediata: [], vencidos: [], hoy: [], proximos_7_dias: [], en_espera: [], sin_fecha: [] };
+      for (const p of rows) {
+        const d = diasHasta(p.fecha_compromiso);
+        const fila = resumenFila(p);
+        const alta = String(p.prioridad || '').toLowerCase() === 'alta';
+        const esperaMi = Number(p.responsable_id) === sesion.id && ['delegado', 'reagendado'].includes(p.estatus);
+        if (p.estatus === 'en_espera') { grupos.en_espera.push(fila); continue; }
+        if (d === null) grupos.sin_fecha.push(fila);
+        else if (d < 0) grupos.vencidos.push(fila);
+        else if (d === 0) grupos.hoy.push(fila);
+        else if (d <= 7) grupos.proximos_7_dias.push(fila);
+        if ((d !== null && d < 0) || d === 0 || (alta && d !== null && d <= 2) || esperaMi) grupos.atencion_inmediata.push(fila);
+      }
+      return { hoy: hoyMx(), grupos };
+    }
+
+    case 'actualizar_pendiente': {
+      const { rows } = await client.execute({ sql: 'SELECT * FROM pendientes WHERE id = ?', args: [input.id] });
+      const p = rows[0];
+      if (!p) return { error: 'No encontrado' };
+      const campos = [], args = [], editados = [];
+      const set = (k, v) => { campos.push(`${k} = ?`); args.push(v); editados.push(k); };
+      if (input.titulo !== undefined) set('titulo', input.titulo);
+      if (input.descripcion !== undefined) set('descripcion', input.descripcion);
+      if (input.prioridad !== undefined) set('prioridad', input.prioridad);
+      if (input.area !== undefined) set('area', input.area);
+      if (input.fecha_compromiso !== undefined) set('fecha_compromiso', input.fecha_compromiso || null);
+      if (!campos.length) return { error: 'No indicaste qué cambiar.' };
+      const negado = validarActualizacion(p, sesion, { editaCampos: true });
+      if (negado) return { error: negado };
+      campos.push(`updated_at = datetime('now')`);
+      args.push(input.id);
+      await client.execute({ sql: `UPDATE pendientes SET ${campos.join(', ')} WHERE id = ?`, args });
+      await client.execute({
+        sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, 'Editado', ?, ?)`,
+        args: [input.id, `por ${sesion.nombre} (asistente) · ${editados.join(', ')}`, sesion.id],
+      });
+      return { ok: true, mensaje: `Actualicé el pendiente #${input.id} (${editados.join(', ')}).` };
+    }
+
     case 'crear_pendiente': {
       if (!input.titulo) return { error: 'Falta el título.' };
       let responsableId = null;
@@ -271,6 +345,10 @@ Cómo trabajas:
 - Para responder preguntas sobre pendientes (qué tengo, qué espera alguien, qué está atrasado, qué necesita mi respuesta), usa las herramientas de lectura. No inventes datos: si una herramienta no devuelve nada, dilo.
 - Cuando el usuario mencione a una persona por su nombre (ej. "Carlos") y no estés seguro de a quién se refiere, usa listar_usuarios para resolverlo.
 - Los pendientes "por aceptar" son los que están en estatus Delegado o Reagendado (el responsable aún no los acepta).
+
+Organización de pendientes (categorías de la lista): atención inmediata (vencido, vence hoy, prioridad Alta que vence en ≤2 días, o que tú debes aceptar), vencidos, hoy, próximos 7 días, en espera y sin fecha.
+- Cuando te pidan "organiza/reorganiza mis pendientes" o "cómo van", usa clasificar_pendientes y preséntalos agrupados por categoría, empezando por lo de atención inmediata.
+- Ofrece mejoras concretas y aplícalas (tras confirmar) con actualizar_pendiente: ponerle fecha a los que no tienen, subir/bajar prioridad, o asignar área. Áreas válidas: Finanzas, Cobranza, Cotizaciones, Seguimiento a cotizaciones, Operación, Proyectos, Gestión, Administración.
 
 Acciones que modifican datos (crear_pendiente, cambiar_estatus):
 - NUNCA las ejecutes sin confirmación. Primero resume en una frase lo que vas a hacer (título, a quién, fecha) y termina preguntando "¿Lo confirmo?".

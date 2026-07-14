@@ -110,9 +110,13 @@ async function cargar() {
 }
 
 function abrir(id) { props.f7router.navigate(`/pendientes/${id}/`); }
-// Cada tarjeta del semáforo lleva a la lista ya filtrada por ese estado.
+// Cada tarjeta del semáforo lleva a la lista, mapeada a las categorías nuevas.
+const MAPA_FILTRO = {
+  vencido: 'vencidos', hoy: 'hoy', manana: 'proximos',
+  tiempo: 'proximos', concluido: 'concluidos', espera: 'espera',
+};
 function verFiltrados(key) {
-  setFiltro(key);
+  setFiltro(MAPA_FILTRO[key] || key);
   f7.tab.show('#view-pendientes');
 }
 function irCaptura() { f7.tab.show('#view-captura'); }
