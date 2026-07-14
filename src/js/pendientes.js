@@ -61,6 +61,9 @@ export function horaLocal(createdAt) {
 export const esCreador = (p, u) => !!u && p.creado_por === u.id;
 export const esResponsable = (p, u) => !!u && p.responsable_id === u.id;
 export const puedeVer = (p, u) => esCreador(p, u) || esResponsable(p, u);
+// Tarea personal: el usuario es a la vez creador y responsable. Estas se
+// cierran en un toque, sin evidencia ni revisión.
+export const esPersonal = (p, u) => esCreador(p, u) && esResponsable(p, u);
 
 // Cada quien actúa según su papel en el pendiente. Dirección no tiene poderes
 // extra (decisión de negocio: ve y actúa igual que un colaborador).
@@ -90,6 +93,16 @@ export function accionesDisponibles(p, u) {
   const acciones = [];
   const comoResp = puedeComoResponsable(p, u);
   const comoCre = puedeComoCreador(p, u);
+
+  // Tarea personal (yo la creé y es para mí): cierre en un toque, sin
+  // evidencia ni revisión. Corta el flujo normal de delegación.
+  if (esPersonal(p, u)) {
+    if (!CERRADOS.includes(p.estatus)) {
+      acciones.push({ id: 'completar', texto: 'Completar', tipo: 'estatus', estatus: 'aprobado', color: 'green', fill: true });
+      acciones.push({ id: 'editar', texto: 'Editar', tipo: 'editar' });
+    }
+    return acciones;
+  }
 
   switch (p.estatus) {
     case 'capturado':

@@ -62,6 +62,15 @@
       </div>
     </div>
 
+    <!-- Asignación rápida: para mí (tarea personal, cierre en un toque) -->
+    <div class="para-mi-wrap">
+      <button type="button" class="para-mi-btn" :class="{ active: esParaMi }" @click="toggleParaMi">
+        <i class="f7-icons">{{ esParaMi ? 'checkmark_circle_fill' : 'person_crop_circle' }}</i>
+        {{ esParaMi ? 'Es para mí' : 'Para mí' }}
+      </button>
+      <span v-if="esParaMi" class="para-mi-hint">Sin evidencia; la cierras en un toque.</span>
+    </div>
+
     <!-- Delegación (paso 2) -->
     <div class="list glass-list no-hairlines-md form-list">
       <ul>
@@ -124,7 +133,7 @@
 
     <div class="block">
       <f7-button large fill @click="delegar" :disabled="!form.titulo.trim() || saving">
-        {{ saving ? 'Delegando…' : form.responsable_id ? 'Delegar' : 'Guardar sin asignar' }}
+        {{ saving ? 'Guardando…' : esParaMi ? 'Guardar para mí' : form.responsable_id ? 'Delegar' : 'Guardar sin asignar' }}
       </f7-button>
     </div>
   </f7-page>
@@ -209,10 +218,17 @@ const form = ref({
   area: '',
 });
 
+const esParaMi = computed(() => form.value.responsable_id === store.usuario?.id);
+
 const responsableNombre = computed(() => {
+  if (esParaMi.value) return 'Para mí';
   const u = store.usuarios.find((x) => x.id === form.value.responsable_id);
   return u ? u.nombre : '';
 });
+
+function toggleParaMi() {
+  form.value.responsable_id = esParaMi.value ? null : store.usuario?.id;
+}
 
 const prioridadClase = computed(
   () => ({ Alta: 'st-vencido', Media: 'st-hoy', Baja: 'st-tiempo' }[form.value.prioridad])
@@ -238,8 +254,9 @@ async function pickResponsable() {
     .create({
       title: 'Responsable',
       buttons: [
+        { text: '⭐ Para mí', onClick: () => (form.value.responsable_id = store.usuario?.id) },
         { text: 'Sin asignar', onClick: () => (form.value.responsable_id = null) },
-        ...store.usuarios.map((u) => ({
+        ...store.usuarios.filter((u) => u.id !== store.usuario?.id).map((u) => ({
           text: u.nombre,
           onClick: () => (form.value.responsable_id = u.id),
         })),
@@ -313,6 +330,21 @@ onMounted(cargarUsuarios);
   color: #fff; border-color: transparent;
 }
 .form-list { margin-top: 8px; }
+
+/* Atajo "Para mí" */
+.para-mi-wrap { display: flex; align-items: center; gap: 10px; padding: 10px 16px 0; flex-wrap: wrap; }
+.para-mi-btn {
+  display: inline-flex; align-items: center; gap: 7px; border: 1.5px solid rgba(91, 91, 214, 0.35);
+  background: rgba(91, 91, 214, 0.08); color: var(--inova-primary); border-radius: 999px;
+  padding: 9px 16px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s ease;
+}
+.para-mi-btn i { font-size: 18px; }
+.para-mi-btn:active { transform: scale(0.96); }
+.para-mi-btn.active {
+  background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
+  color: #fff; border-color: transparent; box-shadow: 0 6px 16px rgba(91, 91, 214, 0.35);
+}
+.para-mi-hint { font-size: 12px; color: #8a8699; }
 
 /* ---- Panel de dictado ---- */
 .voz-panel {

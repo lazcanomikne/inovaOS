@@ -88,7 +88,9 @@ export default async function handler(req, res) {
     if (negado) return sendError(res, negado, 403);
 
     // Paso 5 del proceso: no se puede CONCLUIR sin al menos una evidencia.
-    if (estatus === 'concluido') {
+    // Excepción: las tareas personales (creador = responsable) no la requieren.
+    const esPersonal = Number(actual.creado_por) === Number(actual.responsable_id);
+    if (estatus === 'concluido' && !esPersonal) {
       const { rows: ev } = await client.execute({
         sql: 'SELECT COUNT(*) AS n FROM evidencias WHERE pendiente_id = ?',
         args: [id],

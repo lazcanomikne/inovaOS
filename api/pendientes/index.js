@@ -31,6 +31,9 @@ export default async function handler(req, res) {
 
     // El autor sale de la sesión, nunca del cuerpo de la petición.
     const creadoPor = sesion.id;
+    // Tarea personal (para mí): arranca lista para trabajar, sin delegación.
+    const esPersonal = b.responsable_id && Number(b.responsable_id) === Number(creadoPor);
+    const estatusInicial = !b.responsable_id ? 'capturado' : (esPersonal ? 'en_progreso' : 'delegado');
 
     const { rows } = await client.execute({
       sql: `INSERT INTO pendientes
@@ -47,22 +50,22 @@ export default async function handler(req, res) {
         creadoPor,
         b.responsable_id ?? null,
         b.fecha_compromiso ?? null,
-        b.responsable_id ? 'delegado' : 'capturado',
+        estatusInicial,
       ],
     });
     const pendiente = rows[0];
 
     await client.execute({
       sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, 'Creado', ?, ?)`,
-      args: [pendiente.id, `por ${sesion.nombre}`, creadoPor],
+      args: [pendiente.id, esPersonal ? `por ${sesion.nombre} · para sí mismo` : `por ${sesion.nombre}`, creadoPor],
     });
-    if (b.responsable_id) {
+    // Sólo delegación real (a otra persona) genera evento e notificación.
+    if (b.responsable_id && !esPersonal) {
       const responsable = await nombreUsuario(client, b.responsable_id);
       await client.execute({
         sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, 'Delegado', ?, ?)`,
         args: [pendiente.id, responsable ? `a ${responsable}` : null, creadoPor],
       });
-      // Push en tiempo real al responsable: "te asignaron un pendiente".
       await notificarCambio(pendiente, 'delegado', sesion);
     }
     return sendJson(res, pendiente, 201);
