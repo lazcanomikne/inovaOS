@@ -181,6 +181,38 @@ export async function enviarCodigo(email, codigo, nombre) {
   });
 }
 
+// Aviso libre: un usuario le manda un mensaje a otro (desde el asistente).
+export async function enviarAviso(destinatario, { de, mensaje }) {
+  const from = `InovaOS <${process.env.SMTP_USER}>`;
+  const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const quien = esc(de || 'Tu equipo');
+  const cuerpo = esc(mensaje);
+  const html = `
+<html lang="es"><body style="margin:0;background:#f2f1fb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f1fb;padding:24px 0;"><tr><td align="center">
+    <table role="presentation" width="100%" style="max-width:480px;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 6px 24px rgba(17,12,46,.10);">
+      ${CABECERA}
+      <tr><td style="padding:24px;">
+        <p style="margin:0 0 6px;font-size:13px;color:#8a8699;">Mensaje de ${quien}</p>
+        <div style="font-size:16px;color:#1f1a33;line-height:1.55;white-space:pre-wrap;">${cuerpo}</div>
+        <a href="${APP_URL}" style="display:block;text-align:center;margin-top:22px;background:linear-gradient(135deg,#5b5bd6,#7c6cf0);color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:14px;border-radius:14px;">Abrir InovaOS</a>
+      </td></tr>
+      <tr><td style="padding:0 24px 22px;">
+        <p style="margin:0;font-size:12px;color:#a5a1b5;">Recibiste este aviso desde InovaOS. Correo automático, no respondas a esta dirección.</p>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+  await tx().sendMail({
+    from,
+    to: destinatario,
+    subject: `📣 ${de || 'Tu equipo'} te envió un aviso · InovaOS`,
+    text: `${de || 'Tu equipo'} te envía un aviso desde InovaOS:\n\n${mensaje}\n\nAbre InovaOS en ${APP_URL}`,
+    html,
+    attachments: [ADJUNTO_LOGO],
+  });
+}
+
 // Comprueba conexión + autenticación sin enviar nada.
 export async function verificarSmtp() {
   await tx().verify();

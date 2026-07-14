@@ -3,7 +3,8 @@
 // usuario (mismo aislamiento que el resto del API). Dirección ve todo; el resto,
 // sólo lo suyo (creado_por o responsable_id = su id).
 import { validarActualizacion } from './_permisos.js';
-import { notificarCambio } from './_push.js';
+import { notificarCambio, enviarPush } from './_push.js';
+import { enviarAviso } from './_mail.js';
 
 const CERRADOS = ['concluido', 'aprobado'];
 const ETIQUETAS = {
@@ -80,6 +81,7 @@ export const HERRAMIENTAS = [
       type: 'object',
       properties: {
         id: { type: 'integer' },
+        responsable: { type: 'string', description: 'Nombre o correo del nuevo responsable; cadena vacía para dejarlo sin asignar. Al asignar uno a un pendiente sin asignar, se delega automáticamente.' },
         fecha_compromiso: { type: 'string', description: 'Fecha límite YYYY-MM-DD; cadena vacía para quitarla.' },
         prioridad: { type: 'string', enum: ['Alta', 'Media', 'Baja'] },
         area: { type: 'string', enum: ['Finanzas', 'Cobranza', 'Cotizaciones', 'Seguimiento a cotizaciones', 'Operación', 'Proyectos', 'Gestión', 'Administración'] },
@@ -87,6 +89,18 @@ export const HERRAMIENTAS = [
         descripcion: { type: 'string' },
       },
       required: ['id'],
+    },
+  },
+  {
+    name: 'notificar_usuario',
+    description: 'Envía un aviso (push + correo) a un usuario con el mensaje que indiques. Úsala cuando pidan "avísale a X que…" o "recuérdale a X…". NO la llames sin confirmar el destinatario y el texto.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        usuario: { type: 'string', description: 'Nombre o correo del destinatario.' },
+        mensaje: { type: 'string', description: 'El texto del aviso.' },
+      },
+      required: ['usuario', 'mensaje'],
     },
   },
   {
@@ -249,9 +263,28 @@ export async function ejecutarHerramienta(client, sesion, nombre, input = {}) {
       if (input.prioridad !== undefined) set('prioridad', input.prioridad);
       if (input.area !== undefined) set('area', input.area);
       if (input.fecha_compromiso !== undefined) set('fecha_compromiso', input.fecha_compromiso || null);
+
+      let nuevoResp; // undefined = sin cambio de responsable
+      if (input.responsable !== undefined) {
+        if (!String(input.responsable).trim()) { set('responsable_id', null); nuevoResp = null; }
+        else {
+          const us = await resolverUsuario(client, input.responsable);
+          if (!us.length) return { error: `No encontré a "${input.responsable}".` };
+          if (us.length > 1) return { error: `"${input.responsable}" coincide con varios: ${us.map((u) => u.nombre).join(', ')}. Especifica cuál.` };
+          set('responsable_id', us[0].id);
+          nuevoResp = us[0].id;
+          editados[editados.length - 1] = `responsable (${us[0].nombre})`;
+        }
+      }
+
       if (!campos.length) return { error: 'No indicaste qué cambiar.' };
       const negado = validarActualizacion(p, sesion, { editaCampos: true });
       if (negado) return { error: negado };
+
+      // Al asignar responsable a algo sin asignar: se delega (o pasa a en progreso si es para uno mismo).
+      if (nuevoResp && p.estatus === 'capturado') {
+        set('estatus', Number(nuevoResp) === sesion.id ? 'en_progreso' : 'delegado');
+      }
       campos.push(`updated_at = datetime('now')`);
       args.push(input.id);
       await client.execute({ sql: `UPDATE pendientes SET ${campos.join(', ')} WHERE id = ?`, args });
@@ -259,7 +292,27 @@ export async function ejecutarHerramienta(client, sesion, nombre, input = {}) {
         sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, 'Editado', ?, ?)`,
         args: [input.id, `por ${sesion.nombre} (asistente) · ${editados.join(', ')}`, sesion.id],
       });
+      // Notifica a la otra persona si se le asignó el pendiente.
+      if (nuevoResp && Number(nuevoResp) !== sesion.id) {
+        await notificarCambio({ id: input.id, titulo: input.titulo ?? p.titulo, creado_por: p.creado_por, responsable_id: nuevoResp }, 'delegado', sesion);
+      }
       return { ok: true, mensaje: `Actualicé el pendiente #${input.id} (${editados.join(', ')}).` };
+    }
+
+    case 'notificar_usuario': {
+      const us = await resolverUsuario(client, input.usuario);
+      if (!us.length) return { error: `No encontré a "${input.usuario}".` };
+      if (us.length > 1) return { error: `"${input.usuario}" coincide con varios: ${us.map((u) => u.nombre).join(', ')}. Especifica cuál.` };
+      const u = us[0];
+      const mensaje = String(input.mensaje || '').trim();
+      if (!mensaje) return { error: 'Falta el mensaje del aviso.' };
+      const nPush = await enviarPush(u.id, {
+        title: `📣 Aviso de ${(sesion.nombre || '').split(' ')[0]}`,
+        body: mensaje, url: '/', tag: 'aviso',
+      }).catch(() => 0);
+      let correo = false;
+      try { await enviarAviso(u.email, { de: sesion.nombre, mensaje }); correo = true; } catch { /* el correo es opcional */ }
+      return { ok: true, mensaje: `Avisé a ${u.nombre}: push a ${nPush} dispositivo(s)${correo ? ' y correo enviado' : ' (el correo no salió)'}.` };
     }
 
     case 'crear_pendiente': {
@@ -348,7 +401,9 @@ Cómo trabajas:
 
 Organización de pendientes (categorías de la lista): atención inmediata (vencido, vence hoy, prioridad Alta que vence en ≤2 días, o que tú debes aceptar), vencidos, hoy, próximos 7 días, en espera y sin fecha.
 - Cuando te pidan "organiza/reorganiza mis pendientes" o "cómo van", usa clasificar_pendientes y preséntalos agrupados por categoría, empezando por lo de atención inmediata.
-- Ofrece mejoras concretas y aplícalas (tras confirmar) con actualizar_pendiente: ponerle fecha a los que no tienen, subir/bajar prioridad, o asignar área. Áreas válidas: Finanzas, Cobranza, Cotizaciones, Seguimiento a cotizaciones, Operación, Proyectos, Gestión, Administración.
+- Ofrece mejoras concretas y aplícalas (tras confirmar) con actualizar_pendiente: ponerle fecha a los que no tienen, subir/bajar prioridad, asignar área o asignar responsable. Áreas válidas: Finanzas, Cobranza, Cotizaciones, Seguimiento a cotizaciones, Operación, Proyectos, Gestión, Administración.
+- Puedes reclasificar en lote: leyendo el título/descripción, deduces el área y la prioridad y las aplicas con actualizar_pendiente (una llamada por pendiente). También puedes asignar responsable en lote (p. ej. "asígname a mí todos los que creé sin asignar" → pon como responsable a la persona indicada). Siempre resume cuántos y qué vas a cambiar y confirma antes.
+- Para avisar a alguien: con notificar_usuario le envías un push Y un correo con el mensaje que te den. Confirma destinatario y texto antes de enviar.
 
 Acciones que modifican datos (crear_pendiente, cambiar_estatus):
 - NUNCA las ejecutes sin confirmación. Primero resume en una frase lo que vas a hacer (título, a quién, fecha) y termina preguntando "¿Lo confirmo?".
