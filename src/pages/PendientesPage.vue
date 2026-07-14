@@ -5,6 +5,13 @@
       <f7-nav-title-large>Pendientes</f7-nav-title-large>
     </f7-navbar>
 
+    <!-- Buscador: filtra por cualquier texto del pendiente -->
+    <div class="buscador glass">
+      <i class="f7-icons buscar-ico">search</i>
+      <input type="search" v-model="busqueda" placeholder="Buscar en pendientes…" enterkeyhint="search" />
+      <i v-if="busqueda" class="f7-icons buscar-limpiar" @click="busqueda = ''">xmark_circle_fill</i>
+    </div>
+
     <!-- Relación: para mí / yo delegué -->
     <div class="segmentado glass">
       <button
@@ -76,7 +83,7 @@
           <div class="item-content">
             <div class="item-inner vacio">
               <span class="text-color-gray">{{ mensajeVacio }}</span>
-              <a v-if="filtro !== 'inmediata' || relacion !== 'todas'" class="link" @click="limpiarFiltros">Restablecer</a>
+              <a v-if="filtro !== 'inmediata' || relacion !== 'todas' || busqueda" class="link" @click="limpiarFiltros">Restablecer</a>
             </div>
           </div>
         </li>
@@ -101,6 +108,17 @@ const archivadosCargados = ref(false);
 
 const verArchivados = computed(() => filtro.value === 'archivados');
 const items = computed(() => (verArchivados.value ? archivados.value : activos.value));
+
+// Buscador: filtra por cualquier texto del pendiente, sin acentos ni mayúsculas.
+const busqueda = ref('');
+const normTxt = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+function coincideBusqueda(p) {
+  const q = normTxt(busqueda.value.trim());
+  if (!q) return true;
+  const campos = [p.titulo, p.descripcion, p.responsable_nombre, p.area, p.cliente, p.tipo, p.prioridad, etiquetaEstatus(p.estatus)]
+    .map(normTxt).join(' ');
+  return campos.includes(q);
+}
 
 // Relación con el pendiente. Sobrevive a la navegación (la vista queda montada).
 const relacion = ref('todas');
@@ -139,9 +157,11 @@ const coincide = (p, key) => enCategoria(p, key, store.usuario);
 // Primero acotamos por relación, luego por estatus (los conteos de los chips
 // reflejan la relación elegida). En la vista de archivados no se filtra por estatus.
 const enRelacion = computed(() => items.value.filter(coincideRelacion));
-const filtrados = computed(() =>
-  verArchivados.value ? enRelacion.value : enRelacion.value.filter((p) => coincide(p, filtro.value))
-);
+const filtrados = computed(() => {
+  // Al buscar, se ignora el chip de categoría: se busca en todo lo visible.
+  if (busqueda.value.trim()) return enRelacion.value.filter(coincideBusqueda);
+  return verArchivados.value ? enRelacion.value : enRelacion.value.filter((p) => coincide(p, filtro.value));
+});
 const conteo = (key) => {
   if (key === 'archivados') return archivados.value.filter(coincideRelacion).length;
   return activos.value.filter(coincideRelacion).filter((p) => coincide(p, key)).length;
@@ -149,6 +169,7 @@ const conteo = (key) => {
 const etiquetaFiltro = computed(() => filtros.find((f) => f.key === filtro.value)?.label ?? '');
 
 const mensajeVacio = computed(() => {
+  if (busqueda.value.trim()) return `Sin resultados para «${busqueda.value.trim()}».`;
   if (verArchivados.value) return 'No tienes pendientes archivados.';
   if (filtro.value === 'inmediata') return 'Nada requiere tu atención inmediata 🎉';
   return `Nada en «${etiquetaFiltro.value}».`;
@@ -157,6 +178,7 @@ const mensajeVacio = computed(() => {
 function limpiarFiltros() {
   filtro.value = 'inmediata';
   relacion.value = 'todas';
+  busqueda.value = '';
 }
 
 function abrir(id) { props.f7router.navigate(`/pendientes/${id}/`); }
@@ -209,6 +231,17 @@ watch(verArchivados, (v) => { if (v && !archivadosCargados.value) cargarArchivad
 </script>
 
 <style scoped>
+.buscador {
+  display: flex; align-items: center; gap: 8px; margin: 10px 16px 0; padding: 9px 14px; border-radius: 14px;
+}
+.buscador .buscar-ico { font-size: 19px; color: rgba(60, 60, 67, 0.5); flex: 0 0 auto; }
+.buscador input {
+  flex: 1; border: none; background: transparent; outline: none; font-size: 16px; color: #1f1a33;
+  font-family: inherit; min-width: 0;
+}
+.buscador input::-webkit-search-cancel-button { display: none; }
+.buscador .buscar-limpiar { font-size: 19px; color: rgba(60, 60, 67, 0.4); cursor: pointer; flex: 0 0 auto; }
+
 .segmentado {
   display: flex; margin: 8px 16px 0; padding: 4px; border-radius: 14px; gap: 4px;
 }
