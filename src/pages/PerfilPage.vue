@@ -96,22 +96,38 @@
       </ul>
     </div>
 
-    <!-- Tema de color -->
-    <div class="block-title">Tema de la app</div>
+    <!-- Temática (figuras de fondo) -->
+    <div class="block-title">Temática</div>
     <div class="tema-grid">
       <button
-        v-for="t in TEMAS"
+        v-for="t in TEMATICAS"
         :key="t.id"
         type="button"
         class="tema-card"
-        :class="{ activo: temaId === t.id }"
-        @click="elegirTema(t.id)"
+        :class="{ activo: tematicaId === t.id }"
+        @click="elegirTematica(t.id)"
       >
-        <span class="tema-muestra" :style="{ background: `linear-gradient(135deg, ${t.c1}, ${t.c2})` }">
-          <span class="tema-emoji">{{ t.emoji }}</span>
-        </span>
+        <span class="tema-emoji-grande">{{ t.emoji }}</span>
         <span class="tema-nombre">{{ t.nombre }}</span>
-        <i v-if="temaId === t.id" class="f7-icons tema-check">checkmark_circle_fill</i>
+        <i v-if="tematicaId === t.id" class="f7-icons tema-check">checkmark_circle_fill</i>
+      </button>
+    </div>
+
+    <!-- Color -->
+    <div class="block-title">Color</div>
+    <div class="color-row">
+      <button
+        v-for="c in COLORES"
+        :key="c.id"
+        type="button"
+        class="color-chip"
+        :class="{ activo: colorId === c.id }"
+        @click="elegirColor(c.id)"
+      >
+        <span class="color-muestra" :style="{ background: c.muestra }">
+          <i v-if="colorId === c.id" class="f7-icons">checkmark</i>
+        </span>
+        <span class="color-nombre">{{ c.nombre }}</span>
       </button>
     </div>
 
@@ -152,7 +168,7 @@ import { api } from '@/js/api.js';
 import { store, limpiarSesion } from '@/js/store.js';
 import { tieneFaceId, registrarPasskey } from '@/js/passkey.js';
 import { estadoPush, activarPush, desactivarPush } from '@/js/push.js';
-import { TEMAS, temaActual, aplicarTema } from '@/js/tema.js';
+import { TEMATICAS, COLORES, tematicaActual, colorActual, aplicarTematica, aplicarColor } from '@/js/tema.js';
 
 const usuario = computed(() => store.usuario ?? { nombre: '', rol: '', email: '' });
 const version = __APP_VERSION__ || '0.1.0';
@@ -169,11 +185,16 @@ const passkeys = ref([]);
 const soportaFaceId = ref(false);
 const actualizando = ref(false);
 
-// Tema de color
-const temaId = ref(temaActual());
-function elegirTema(id) {
-  temaId.value = id;
-  aplicarTema(id);
+// Apariencia: temática (figuras) + color, independientes.
+const tematicaId = ref(tematicaActual());
+const colorId = ref(colorActual());
+function elegirTematica(id) {
+  tematicaId.value = id;
+  aplicarTematica(id);
+}
+function elegirColor(id) {
+  colorId.value = id;
+  aplicarColor(id);
 }
 
 // Foto de perfil
@@ -343,13 +364,24 @@ onMounted(async () => {
 }
 .tema-card:active { transform: scale(0.97); }
 .tema-card.activo { border-color: var(--inova-primary); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08); }
-.tema-muestra {
-  width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-}
-.tema-emoji { font-size: 24px; }
-.tema-nombre { font-size: 14px; font-weight: 700; color: #2a2540; }
+.tema-emoji-grande { font-size: 36px; line-height: 1; }
+.tema-nombre { font-size: 13px; font-weight: 700; color: #2a2540; text-align: center; }
 .tema-check { position: absolute; top: 8px; right: 8px; font-size: 20px; color: var(--inova-primary); }
+
+/* Selector de color */
+.color-row { display: flex; gap: 12px; overflow-x: auto; padding: 4px 16px 8px; -webkit-overflow-scrolling: touch; }
+.color-chip {
+  flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  border: none; background: transparent; cursor: pointer; padding: 0; width: 58px;
+}
+.color-muestra {
+  width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18); border: 2px solid rgba(255, 255, 255, 0.7); transition: transform 0.12s ease;
+}
+.color-muestra i { color: #fff; font-size: 22px; font-weight: 800; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+.color-chip.activo .color-muestra { transform: scale(1.08); outline: 2.5px solid var(--inova-primary); outline-offset: 2px; }
+.color-chip:active .color-muestra { transform: scale(0.94); }
+.color-nombre { font-size: 11px; font-weight: 600; color: #6b6780; white-space: nowrap; }
 .perfil-nombre { font-size: 20px; font-weight: 800; }
 .perfil-rol { opacity: 0.7; font-size: 14px; }
 .perfil-email { opacity: 0.45; font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; }

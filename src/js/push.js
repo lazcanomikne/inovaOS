@@ -58,6 +58,20 @@ export async function activarPush() {
   return true;
 }
 
+// Reasegura que ESTE dispositivo quede guardado en el servidor para el usuario
+// actual. Se llama al abrir la app: si cambias de teléfono (o inicias sesión en
+// uno nuevo) y ya tenías las notificaciones activas, tu nuevo dispositivo se
+// registra solo, sin tener que volver a tocar el interruptor.
+export async function sincronizar() {
+  try {
+    if (!soportaPush() || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg ? await reg.pushManager.getSubscription() : null;
+    if (!sub) return;
+    await api.push.suscribir(sub.toJSON(), nombreDispositivo());
+  } catch { /* silencioso: nunca debe romper el arranque */ }
+}
+
 export async function desactivarPush() {
   const reg = await navigator.serviceWorker.getRegistration();
   const sub = reg ? await reg.pushManager.getSubscription() : null;

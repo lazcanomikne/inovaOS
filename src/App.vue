@@ -45,6 +45,7 @@ import { f7, f7ready } from 'framework7-vue';
 import routes from '@/js/routes.js';
 import { api } from '@/js/api.js';
 import { store, setSesion } from '@/js/store.js';
+import { sincronizar as sincronizarPush } from '@/js/push.js';
 import LoginPage from '@/pages/LoginPage.vue';
 
 const f7params = reactive({
@@ -88,6 +89,9 @@ onMounted(async () => {
   try {
     const { usuario } = await api.auth.yo();
     setSesion(usuario);
+    // Si este dispositivo ya tiene notificaciones activas, lo (re)registra para
+    // el usuario actual — así al cambiar de teléfono sigue recibiendo push.
+    sincronizarPush();
   } catch {
     setSesion(null); // 401: se muestra el login
   } finally {
