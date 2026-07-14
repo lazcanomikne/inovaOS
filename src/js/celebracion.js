@@ -51,15 +51,19 @@ function inyectarEstilos() {
   s.textContent = `
   .celebra-overlay{position:fixed;inset:0;z-index:99999;pointer-events:none;display:flex;align-items:center;justify-content:center}
   .celebra-overlay canvas{position:absolute;inset:0}
-  .celebra-banner{position:relative;font-size:42px;font-weight:900;color:#fff;letter-spacing:-.02em;
-    background:linear-gradient(135deg,#5b5bd6,#7c6cf0);padding:14px 32px;border-radius:22px;
+  .celebra-banner{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;
+    font-size:42px;font-weight:900;color:#fff;letter-spacing:-.02em;
+    background:linear-gradient(135deg,#5b5bd6,#7c6cf0);padding:20px 34px;border-radius:24px;
     box-shadow:0 14px 44px rgba(91,91,214,.5);transform:scale(0);
-    animation:celebra-pop 2.4s cubic-bezier(.2,.8,.2,1) forwards;text-shadow:0 2px 8px rgba(0,0,0,.15)}
+    animation:celebra-pop 4.4s cubic-bezier(.2,.8,.2,1) forwards;text-shadow:0 2px 8px rgba(0,0,0,.15)}
+  .celebra-copa{font-size:60px;line-height:1;filter:drop-shadow(0 5px 12px rgba(0,0,0,.25));
+    animation:celebra-copa 4.4s ease-in-out}
+  @keyframes celebra-copa{0%,100%{transform:rotate(0)}8%{transform:rotate(-12deg)}16%{transform:rotate(12deg)}24%{transform:rotate(-6deg)}32%{transform:rotate(0)}}
   @keyframes celebra-pop{
     0%{transform:scale(0) rotate(-8deg);opacity:0}
-    14%{transform:scale(1.18) rotate(3deg);opacity:1}
-    28%{transform:scale(1) rotate(0)}
-    80%{transform:scale(1);opacity:1}
+    8%{transform:scale(1.18) rotate(3deg);opacity:1}
+    16%{transform:scale(1) rotate(0)}
+    88%{transform:scale(1);opacity:1}
     100%{transform:scale(.92);opacity:0}}`;
   document.head.appendChild(s);
 }
@@ -70,7 +74,7 @@ function confeti(mensaje) {
   const canvas = document.createElement('canvas');
   const banner = document.createElement('div');
   banner.className = 'celebra-banner';
-  banner.textContent = mensaje;
+  banner.innerHTML = `<span class="celebra-copa">🏆</span><span>${mensaje}</span>`;
   cont.appendChild(canvas);
   cont.appendChild(banner);
   document.body.appendChild(cont);
@@ -98,16 +102,19 @@ function confeti(mensaje) {
       rot: Math.random() * Math.PI,
       vr: (Math.random() - 0.5) * 0.32,
       shape: Math.random() < 0.5 ? 'rect' : 'circle',
+      delay: Math.random() * 1800, // se lanzan escalonados para durar más
     });
   }
 
-  const dur = 2600;
+  const dur = 4600;
   let inicio = null;
   function frame(ts) {
     if (!inicio) inicio = ts;
     const prog = ts - inicio;
     g.clearRect(0, 0, W, H);
     for (const c of parts) {
+      const local = prog - c.delay;
+      if (local < 0) continue; // aún no se lanza
       c.vy += c.g;
       c.x += c.vx;
       c.y += c.vy;
@@ -116,7 +123,7 @@ function confeti(mensaje) {
       g.save();
       g.translate(c.x, c.y);
       g.rotate(c.rot);
-      g.globalAlpha = Math.max(0, 1 - prog / dur);
+      g.globalAlpha = Math.max(0, 1 - local / 2600); // cada pieza se desvanece en su propia vida
       g.fillStyle = c.color;
       if (c.shape === 'rect') g.fillRect(-c.size / 2, -c.size / 2, c.size, c.size * 0.6);
       else { g.beginPath(); g.arc(0, 0, c.size / 2, 0, 7); g.fill(); }
