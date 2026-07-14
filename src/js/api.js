@@ -51,6 +51,7 @@ export const api = {
   },
   usuarios: {
     list: () => request('/usuarios'),
+    actualizar: (body) => request('/usuarios', { method: 'PATCH', body }),
   },
   tablero: {
     resumen: () => request('/tablero'),

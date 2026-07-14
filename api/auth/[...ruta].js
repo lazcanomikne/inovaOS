@@ -140,7 +140,8 @@ export default async function handler(req, res) {
         const u = await sesionDe(req);
         if (!u) return sendError(res, 'No autenticado', 401);
         const tiene = await credencialesDe(u.id);
-        return sendJson(res, { usuario: u, passkeys: tiene.length });
+        const { rows } = await db().execute({ sql: 'SELECT avatar FROM usuarios WHERE id = ?', args: [u.id] });
+        return sendJson(res, { usuario: { ...u, avatar: rows[0]?.avatar ?? null }, passkeys: tiene.length });
       }
 
       case 'POST salir': {

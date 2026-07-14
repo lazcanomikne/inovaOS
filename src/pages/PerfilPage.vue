@@ -8,7 +8,12 @@
     <div class="block">
       <div class="card glass-strong perfil-card">
         <div class="card-content card-content-padding perfil-head">
-          <div class="perfil-avatar">{{ iniciales }}</div>
+          <button type="button" class="perfil-avatar" :class="{ 'con-foto': usuario.avatar }" @click="pickFoto" :disabled="subiendoFoto">
+            <img v-if="usuario.avatar" :src="usuario.avatar" alt="Foto de perfil" />
+            <span v-else>{{ iniciales }}</span>
+            <span class="avatar-cam"><i class="f7-icons">{{ subiendoFoto ? 'hourglass' : 'camera_fill' }}</i></span>
+          </button>
+          <input ref="fotoInput" type="file" accept="image/*" class="foto-oculto" @change="onFoto" />
           <div class="perfil-datos">
             <div class="perfil-nombre">{{ usuario.nombre }}</div>
             <div class="perfil-rol">{{ etiquetaRol }}</div>
@@ -91,6 +96,25 @@
       </ul>
     </div>
 
+    <!-- Tema de color -->
+    <div class="block-title">Tema de la app</div>
+    <div class="tema-grid">
+      <button
+        v-for="t in TEMAS"
+        :key="t.id"
+        type="button"
+        class="tema-card"
+        :class="{ activo: temaId === t.id }"
+        @click="elegirTema(t.id)"
+      >
+        <span class="tema-muestra" :style="{ background: `linear-gradient(135deg, ${t.c1}, ${t.c2})` }">
+          <span class="tema-emoji">{{ t.emoji }}</span>
+        </span>
+        <span class="tema-nombre">{{ t.nombre }}</span>
+        <i v-if="temaId === t.id" class="f7-icons tema-check">checkmark_circle_fill</i>
+      </button>
+    </div>
+
     <div class="list glass-list no-hairlines">
       <ul>
         <li class="item-content">
@@ -128,6 +152,7 @@ import { api } from '@/js/api.js';
 import { store, limpiarSesion } from '@/js/store.js';
 import { tieneFaceId, registrarPasskey } from '@/js/passkey.js';
 import { estadoPush, activarPush, desactivarPush } from '@/js/push.js';
+import { TEMAS, temaActual, aplicarTema } from '@/js/tema.js';
 
 const usuario = computed(() => store.usuario ?? { nombre: '', rol: '', email: '' });
 const version = __APP_VERSION__ || '0.1.0';
@@ -143,6 +168,56 @@ const iniciales = computed(() =>
 const passkeys = ref([]);
 const soportaFaceId = ref(false);
 const actualizando = ref(false);
+
+// Tema de color
+const temaId = ref(temaActual());
+function elegirTema(id) {
+  temaId.value = id;
+  aplicarTema(id);
+}
+
+// Foto de perfil
+const fotoInput = ref(null);
+const subiendoFoto = ref(false);
+function pickFoto() {
+  if (!subiendoFoto.value) fotoInput.value?.click();
+}
+// Reduce la imagen a un cuadrado (recorte centrado) y la comprime a JPEG.
+function reducirImagen(file, max = 256) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const lado0 = Math.min(img.width, img.height);
+      const lado = Math.min(max, lado0);
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = lado;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, (img.width - lado0) / 2, (img.height - lado0) / 2, lado0, lado0, 0, 0, lado, lado);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo leer la imagen')); };
+    img.src = url;
+  });
+}
+async function onFoto(e) {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { f7.dialog.alert('Elige una imagen.', 'Foto de perfil'); return; }
+  subiendoFoto.value = true;
+  try {
+    const dataUrl = await reducirImagen(file, 256);
+    const actualizado = await api.usuarios.actualizar({ avatar: dataUrl });
+    if (store.usuario) store.usuario.avatar = actualizado.avatar;
+    f7.toast.create({ text: 'Foto actualizada ✓', closeTimeout: 1600, position: 'center' }).open();
+  } catch (err) {
+    f7.dialog.alert(err.message || 'No se pudo actualizar la foto.', 'Foto de perfil');
+  } finally {
+    subiendoFoto.value = false;
+  }
+}
 
 // Notificaciones push
 const pushEstado = ref('no-soportado');
@@ -243,11 +318,38 @@ onMounted(async () => {
 .perfil-head { display: flex; align-items: center; gap: 16px; }
 .perfil-datos { flex: 1; min-width: 0; }
 .perfil-avatar {
-  width: 64px; height: 64px; border-radius: 50%;
+  position: relative; width: 66px; height: 66px; border-radius: 50%; padding: 0; border: none;
   background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
   color: #fff; display: flex; align-items: center; justify-content: center;
-  font-size: 24px; font-weight: 800; flex-shrink: 0;
+  font-size: 24px; font-weight: 800; flex-shrink: 0; cursor: pointer; overflow: visible;
 }
+.perfil-avatar span { display: flex; align-items: center; justify-content: center; }
+.perfil-avatar img { width: 66px; height: 66px; border-radius: 50%; object-fit: cover; display: block; }
+.perfil-avatar .avatar-cam {
+  position: absolute; right: -2px; bottom: -2px; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--inova-primary); border: 2px solid #fff; display: flex; align-items: center; justify-content: center;
+}
+.perfil-avatar .avatar-cam i { font-size: 12px; color: #fff; }
+.perfil-avatar:active { transform: scale(0.96); }
+.foto-oculto { display: none; }
+
+/* Selector de tema */
+.tema-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
+.tema-card {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  border: 1.5px solid rgba(120, 120, 128, 0.18); background: rgba(255, 255, 255, 0.65);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border-radius: 18px; padding: 14px 10px; cursor: pointer; transition: all 0.15s ease;
+}
+.tema-card:active { transform: scale(0.97); }
+.tema-card.activo { border-color: var(--inova-primary); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08); }
+.tema-muestra {
+  width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+.tema-emoji { font-size: 24px; }
+.tema-nombre { font-size: 14px; font-weight: 700; color: #2a2540; }
+.tema-check { position: absolute; top: 8px; right: 8px; font-size: 20px; color: var(--inova-primary); }
 .perfil-nombre { font-size: 20px; font-weight: 800; }
 .perfil-rol { opacity: 0.7; font-size: 14px; }
 .perfil-email { opacity: 0.45; font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; }
