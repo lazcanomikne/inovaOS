@@ -25,7 +25,7 @@ async function metricas(res, client, sesion) {
             SUM(CASE WHEN p.estatus IN ('concluido','aprobado') THEN 1 ELSE 0 END) AS completados,
             SUM(CASE WHEN p.fecha_compromiso < ? AND p.estatus NOT IN ('concluido','aprobado') THEN 1 ELSE 0 END) AS retrasos
           FROM pendientes p
-          WHERE p.responsable_id IS NOT NULL ${filtro}
+          WHERE p.responsable_id IS NOT NULL AND COALESCE(p.archivado, 0) = 0 ${filtro}
           GROUP BY p.responsable_id`,
     args: [hoy, ...fArgs],
   });
@@ -36,7 +36,7 @@ async function metricas(res, client, sesion) {
             AVG((julianday(h.created_at) - julianday(p.created_at)) * 24.0) AS horas
           FROM pendientes p
           JOIN historial h ON h.pendiente_id = p.id AND h.evento = 'Aceptado'
-          WHERE p.responsable_id IS NOT NULL ${filtro}
+          WHERE p.responsable_id IS NOT NULL AND COALESCE(p.archivado, 0) = 0 ${filtro}
           GROUP BY p.responsable_id`,
     args: fArgs,
   });
@@ -48,7 +48,7 @@ async function metricas(res, client, sesion) {
             COUNT(e.id) AS evidencias
           FROM pendientes p
           LEFT JOIN evidencias e ON e.pendiente_id = p.id
-          WHERE p.estatus IN ('concluido','aprobado') AND p.responsable_id IS NOT NULL ${filtro}
+          WHERE p.estatus IN ('concluido','aprobado') AND p.responsable_id IS NOT NULL AND COALESCE(p.archivado, 0) = 0 ${filtro}
           GROUP BY p.responsable_id`,
     args: fArgs,
   });
@@ -89,7 +89,7 @@ export default async function handler(req, res) {
   const { rows } = await client.execute({
     sql: `SELECT p.*, u.nombre AS responsable_nombre
           FROM pendientes p LEFT JOIN usuarios u ON u.id = p.responsable_id
-          WHERE p.creado_por = ? OR p.responsable_id = ?`,
+          WHERE (p.creado_por = ? OR p.responsable_id = ?) AND COALESCE(p.archivado, 0) = 0`,
     args: [sesion.id, sesion.id],
   });
 

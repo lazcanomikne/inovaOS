@@ -10,17 +10,18 @@ export default async function handler(req, res) {
   const client = db();
 
   if (req.method === 'GET') {
-    // Cada quien ve lo suyo: lo que le asignaron, lo que él delegó, o los
-    // pendientes donde lo etiquetaron en un paso del checklist.
+    // Por defecto se ocultan los archivados; con ?archivados=1 se ven SOLO esos.
+    const soloArchivados = req.query.archivados === '1' ? 1 : 0;
     const { rows } = await client.execute({
       sql: `
         SELECT p.*, u.nombre AS responsable_nombre
         FROM pendientes p
         LEFT JOIN usuarios u ON u.id = p.responsable_id
-        WHERE p.creado_por = ? OR p.responsable_id = ?
-           OR p.id IN (SELECT pendiente_id FROM checklist WHERE asignado_a = ?)
+        WHERE (p.creado_por = ? OR p.responsable_id = ?
+               OR p.id IN (SELECT pendiente_id FROM checklist WHERE asignado_a = ?))
+          AND COALESCE(p.archivado, 0) = ?
         ORDER BY p.fecha_compromiso IS NULL, p.fecha_compromiso ASC`,
-      args: [sesion.id, sesion.id, sesion.id],
+      args: [sesion.id, sesion.id, sesion.id, soloArchivados],
     });
     return sendJson(res, rows);
   }

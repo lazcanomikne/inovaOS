@@ -36,6 +36,7 @@ export default async function handler(req, res) {
           JOIN usuarios u ON u.id = p.responsable_id
           LEFT JOIN usuarios c ON c.id = p.creado_por
           WHERE p.estatus NOT IN ('concluido','aprobado')
+            AND COALESCE(p.archivado, 0) = 0
             AND (p.fecha_compromiso IS NOT NULL OR p.estatus IN ('delegado','reagendado'))`,
     args: [],
   });

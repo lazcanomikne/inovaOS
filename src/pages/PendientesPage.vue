@@ -44,25 +44,33 @@
 
     <div v-else class="list glass-list media-list no-hairlines">
       <ul>
-        <li v-for="p in filtrados" :key="p.id" @click="abrir(p.id)">
-          <a class="item-link item-content">
-            <div class="item-media">
-              <span class="st-dot" :class="'st-' + estatusColor(p)"></span>
-            </div>
-            <div class="item-inner">
-              <div class="item-title-row">
-                <div class="item-title">{{ p.titulo }}</div>
-                <div class="item-after badge-glass">{{ p.prioridad }}</div>
+        <li v-for="p in filtrados" :key="p.id" class="swipeout">
+          <div class="swipeout-content">
+            <a class="item-link item-content" @click="abrir(p.id)">
+              <div class="item-media">
+                <span class="st-dot" :class="'st-' + estatusColor(p)"></span>
               </div>
-              <div class="item-subtitle">
-                <span v-if="etiquetaRelacion(p)" class="rel-tag" :class="'rel-' + relacionCon(p, store.usuario)">
-                  {{ etiquetaRelacion(p) }}
-                </span>
-                {{ p.responsable_nombre || 'Sin asignar' }} · {{ etiquetaEstatus(p.estatus) }}
+              <div class="item-inner">
+                <div class="item-title-row">
+                  <div class="item-title">{{ p.titulo }}</div>
+                  <div class="item-after badge-glass">{{ p.prioridad }}</div>
+                </div>
+                <div class="item-subtitle">
+                  <span v-if="etiquetaRelacion(p)" class="rel-tag" :class="'rel-' + relacionCon(p, store.usuario)">
+                    {{ etiquetaRelacion(p) }}
+                  </span>
+                  {{ p.responsable_nombre || 'Sin asignar' }} · {{ etiquetaEstatus(p.estatus) }}
+                </div>
+                <div class="item-text">Vence {{ formatFecha(p.fecha_compromiso) }}</div>
               </div>
-              <div class="item-text">Vence {{ formatFecha(p.fecha_compromiso) }}</div>
-            </div>
-          </a>
+            </a>
+          </div>
+          <div class="swipeout-actions-right">
+            <a href="#" class="swipeout-close swipe-archivar" :class="{ desarchivar: verArchivados }" @click="alternarArchivo(p)">
+              <i class="f7-icons">{{ verArchivados ? 'tray_arrow_up_fill' : 'archivebox_fill' }}</i>
+              <span>{{ verArchivados ? 'Desarchivar' : 'Archivar' }}</span>
+            </a>
+          </div>
         </li>
         <li v-if="!filtrados.length">
           <div class="item-content">
@@ -79,14 +87,20 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
+import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
-import { store, setFiltro } from '@/js/store.js';
+import { store, setFiltro, refrescar } from '@/js/store.js';
 import { estatusColor, etiquetaEstatus, formatFecha, CERRADOS, relacionCon } from '@/js/pendientes.js';
 
 const props = defineProps({ f7router: Object });
 const loading = ref(true);
 const error = ref('');
-const items = ref([]);
+const activos = ref([]);
+const archivados = ref([]);
+const archivadosCargados = ref(false);
+
+const verArchivados = computed(() => filtro.value === 'archivados');
+const items = computed(() => (verArchivados.value ? archivados.value : activos.value));
 
 // Relación con el pendiente. Sobrevive a la navegación (la vista queda montada).
 const relacion = ref('todas');
@@ -126,6 +140,7 @@ const filtros = [
   { key: 'tiempo', label: 'En tiempo' },
   { key: 'espera', label: 'En espera' },
   { key: 'concluido', label: 'Concluidos' },
+  { key: 'archivados', label: 'Archivados' },
 ];
 
 function coincide(p, key) {
@@ -135,13 +150,20 @@ function coincide(p, key) {
 }
 
 // Primero acotamos por relación, luego por estatus (los conteos de los chips
-// reflejan la relación elegida).
+// reflejan la relación elegida). En la vista de archivados no se filtra por estatus.
 const enRelacion = computed(() => items.value.filter(coincideRelacion));
-const filtrados = computed(() => enRelacion.value.filter((p) => coincide(p, filtro.value)));
-const conteo = (key) => (key === 'todos' ? 0 : enRelacion.value.filter((p) => coincide(p, key)).length);
+const filtrados = computed(() =>
+  verArchivados.value ? enRelacion.value : enRelacion.value.filter((p) => coincide(p, filtro.value))
+);
+const conteo = (key) => {
+  if (key === 'todos') return 0;
+  if (key === 'archivados') return archivados.value.filter(coincideRelacion).length;
+  return activos.value.filter(coincideRelacion).filter((p) => coincide(p, key)).length;
+};
 const etiquetaFiltro = computed(() => filtros.find((f) => f.key === filtro.value)?.label ?? '');
 
 const mensajeVacio = computed(() => {
+  if (verArchivados.value) return 'No tienes pendientes archivados.';
   if (filtro.value !== 'todos') return `Nada en «${etiquetaFiltro.value}».`;
   if (relacion.value === 'mia') return 'No tienes pendientes asignados.';
   if (relacion.value === 'delegada') return 'No has delegado pendientes.';
@@ -155,21 +177,51 @@ function limpiarFiltros() {
 
 function abrir(id) { props.f7router.navigate(`/pendientes/${id}/`); }
 
-async function cargar() {
-  loading.value = true;
+async function cargar(silencioso = false) {
+  if (!silencioso) loading.value = true;
   error.value = '';
   try {
-    items.value = await api.pendientes.list();
+    activos.value = await api.pendientes.list();
+    if (archivadosCargados.value) archivados.value = await api.pendientes.list('?archivados=1');
   } catch (e) {
-    error.value = e.message || 'Error de red';
+    if (!silencioso) error.value = e.message || 'Error de red';
   } finally {
     loading.value = false;
   }
 }
+async function cargarArchivados() {
+  try {
+    archivados.value = await api.pendientes.list('?archivados=1');
+    archivadosCargados.value = true;
+  } catch (e) {
+    f7.toast.create({ text: 'No se pudieron cargar los archivados', closeTimeout: 1800, position: 'center' }).open();
+  }
+}
 function onRefresh(done) { cargar().finally(done); }
 
+// Archivar (o desarchivar) un pendiente. No afecta el semáforo/métricas.
+async function alternarArchivo(p) {
+  const archivar = !verArchivados.value;
+  // Optimista: lo quitamos de la lista actual de inmediato.
+  activos.value = activos.value.filter((x) => x.id !== p.id);
+  archivados.value = archivados.value.filter((x) => x.id !== p.id);
+  try {
+    await api.pendientes.archivar(p.id, archivar);
+    if (archivar) archivados.value = [p, ...archivados.value];
+    else activos.value = [p, ...activos.value];
+    refrescar(); // sincroniza Inicio/Tablero (contadores)
+    f7.toast.create({ text: archivar ? 'Archivado' : 'Desarchivado', closeTimeout: 1400, position: 'center' }).open();
+  } catch (e) {
+    f7.toast.create({ text: 'No se pudo archivar', closeTimeout: 1800, position: 'center' }).open();
+    cargar();
+    if (verArchivados.value) cargarArchivados();
+  }
+}
+
 onMounted(cargar);
-watch(() => store.tick, cargar);
+watch(() => store.tick, () => cargar(true)); // recarga silenciosa (sin parpadeo)
+// Carga perezosa de archivados al entrar a esa vista.
+watch(verArchivados, (v) => { if (v && !archivadosCargados.value) cargarArchivados(); });
 </script>
 
 <style scoped>
@@ -211,6 +263,15 @@ watch(() => store.tick, cargar);
 .filtro-chip.active .chip-count { background: rgba(255, 255, 255, 0.25); }
 .vacio { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .item-title-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+/* Botón que aparece al deslizar a la izquierda (estilo WhatsApp) */
+.swipe-archivar {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: linear-gradient(135deg, #ff9f0a, #ffb340); color: #fff !important;
+  font-size: 12px; font-weight: 700; padding: 0 20px; min-width: 96px;
+}
+.swipe-archivar i { font-size: 22px; }
+.swipe-archivar.desarchivar { background: linear-gradient(135deg, #34c759, #30d158); }
 .error-card { border-radius: 18px; padding: 16px; display: flex; gap: 12px; align-items: center; }
 .error-card i { font-size: 28px; color: var(--st-vencido); }
 .error-sub { font-size: 13px; opacity: 0.7; margin-top: 2px; }

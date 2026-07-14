@@ -47,6 +47,7 @@ export const api = {
     get: (id) => request(`/pendientes/${id}`),
     create: (body) => request('/pendientes', { method: 'POST', body }),
     update: (id, body) => request(`/pendientes/${id}`, { method: 'PATCH', body }),
+    archivar: (id, archivado = true) => request(`/pendientes/${id}`, { method: 'PATCH', body: { archivado } }),
     remove: (id) => request(`/pendientes/${id}`, { method: 'DELETE' }),
   },
   usuarios: {

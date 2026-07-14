@@ -68,6 +68,19 @@ export default async function handler(req, res) {
     const actual = await traer(client, id);
     if (!actual) return sendError(res, 'No encontrado', 404);
 
+    // Archivar / desarchivar: acción aparte. No cambia estatus ni afecta el
+    // semáforo/métricas; solo saca (o regresa) el pendiente de la lista.
+    if (b.archivado !== undefined) {
+      if (!puedeVer(actual, sesion)) return sendError(res, 'No encontrado', 404);
+      const val = b.archivado ? 1 : 0;
+      await client.execute({ sql: `UPDATE pendientes SET archivado = ?, updated_at = datetime('now') WHERE id = ?`, args: [val, id] });
+      await client.execute({
+        sql: `INSERT INTO historial (pendiente_id, evento, detalle, actor_id) VALUES (?, ?, ?, ?)`,
+        args: [id, val ? 'Archivado' : 'Desarchivado', `por ${sesion.nombre}`, sesion.id],
+      });
+      return sendJson(res, await traer(client, id));
+    }
+
     const campos = [];
     const args = [];
     const editados = [];
