@@ -219,8 +219,8 @@ html {
   z-index: 13500;
   display: flex;
   align-items: center;
-  gap: 0;
-  padding: 6px 6px;
+  gap: 1px;
+  padding: 8px 7px;
   border-radius: 999px;
   box-shadow: 0 10px 34px rgba(17, 12, 46, 0.22), 0 2px 8px rgba(17, 12, 46, 0.1);
   isolation: isolate;
@@ -243,8 +243,8 @@ html {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  min-width: 40px;
-  padding: 5px 3px;
+  min-width: 43px;
+  padding: 7px 4px;
   border: none;
   background: transparent;
   border-radius: 14px;
@@ -257,20 +257,20 @@ html {
   transition: color 0.15s ease, background 0.15s ease, transform 0.12s ease;
 }
 .dark .fnav-item { color: rgba(235, 235, 245, 0.5); }
-.fnav-item i.f7-icons { font-size: 21px; }
+.fnav-item i.f7-icons { font-size: 24px; }
 .fnav-item:active { transform: scale(0.9); }
 .fnav-item.active { color: var(--inova-primary); }
 
 /* Ítem central "Crear": botón en gradiente */
 .fnav-item.create i.f7-icons {
-  width: 38px;
-  height: 29px;
-  border-radius: 10px;
+  width: 42px;
+  height: 32px;
+  border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 22px;
+  font-size: 24px;
   background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
   box-shadow: 0 5px 14px rgba(91, 91, 214, 0.4);
 }
