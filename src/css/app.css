@@ -164,7 +164,8 @@ html {
     left: 0;
     right: 0;
     height: env(safe-area-inset-top);
-    background: linear-gradient(180deg, rgba(91, 91, 214, 0.92), rgba(124, 108, 240, 0.45));
+    /* Sigue el tema activo (var --f7-theme-color-rgb se sobrescribe por tema). */
+    background: linear-gradient(180deg, rgba(var(--f7-theme-color-rgb), 0.92), rgba(var(--f7-theme-color-rgb), 0.5));
     z-index: 12000;
     pointer-events: none;
   }
