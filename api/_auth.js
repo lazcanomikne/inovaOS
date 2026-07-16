@@ -40,6 +40,17 @@ function leerCookie(req, nombre) {
 }
 
 export async function sesionDe(req) {
+  // Vía de servicio (server-to-server, p. ej. el portal desktop de Inovatech): un
+  // backend de confianza manda X-Service-Token + X-Actor-Email y actúa como ese
+  // usuario. Inerte mientras SERVICE_TOKEN no esté configurado (no afecta el login).
+  const svc = req.headers?.['x-service-token'];
+  if (svc && process.env.SERVICE_TOKEN && igualesEnTiempoConstante(String(svc), String(process.env.SERVICE_TOKEN))) {
+    const email = String(req.headers?.['x-actor-email'] || '').trim();
+    if (!email) return null;
+    const u = await usuarioPorEmail(email);
+    return u ? { id: Number(u.id), email: u.email, nombre: u.nombre, rol: u.rol } : null;
+  }
+
   const token = leerCookie(req, COOKIE);
   if (!token) return null;
   try {
