@@ -420,6 +420,18 @@ img,
   max-width: 100%;
 }
 
+/* ---------- Diálogos con lista larga (Responsable, Área) ----------
+   Un diálogo vertical con muchos botones (p. ej. 16 usuarios) es más alto que
+   la pantalla; como .dialog está centrado y con overflow:hidden, los botones
+   de arriba/abajo se recortaban y no se podían tocar. Aquí se limita la altura
+   y se hace scrolleable la lista de botones. El título queda fijo arriba. */
+.dialog { max-height: 82vh; }
+.dialog-buttons-vertical .dialog-buttons {
+  max-height: 64vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Transiciones suaves */
 * {
   -webkit-tap-highlight-color: transparent;

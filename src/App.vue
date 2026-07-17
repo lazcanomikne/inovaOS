@@ -19,9 +19,11 @@
       </f7-views>
 
       <!-- Pastilla flotante (glass) — en <body> para que quede sobre todo.
-           Se oculta en el chat de IA para dar una vista de conversación completa. -->
+           Se oculta en el chat de IA para dar una vista de conversación completa,
+           y también cuando hay un modal abierto (diálogo, sheet, picker…) para que
+           nunca tape un selector como "Responsable" o "Área". -->
       <Teleport to="body">
-        <nav class="floating-nav" v-show="active !== 'asistente'">
+        <nav class="floating-nav" v-show="active !== 'asistente' && !modalAbierto">
           <button
             v-for="t in tabs"
             :key="t.id"
@@ -40,7 +42,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue';
+import { reactive, ref, computed, onMounted } from 'vue';
 import { f7, f7ready } from 'framework7-vue';
 import routes from '@/js/routes.js';
 import { api } from '@/js/api.js';
@@ -71,6 +73,17 @@ const tabs = [
 
 const active = ref('home');
 
+// La pila se esconde mientras haya un modal abierto (evita que tape selectores
+// como Responsable/Área). Contamos aperturas y cierres; ignoramos toasts y
+// notificaciones (son efímeros y no bloquean la interacción).
+const modalesAbiertos = ref(0);
+const modalAbierto = computed(() => modalesAbiertos.value > 0);
+function modalRelevante(m) {
+  const el = m?.el;
+  if (!el) return true;
+  return !el.classList.contains('toast') && !el.classList.contains('notification');
+}
+
 function show(id) {
   f7.tab.show(`#view-${id}`);
 }
@@ -82,6 +95,12 @@ onMounted(async () => {
     f7.on('tabShow', (tabEl) => {
       const id = tabEl?.id?.replace('view-', '');
       if (id) active.value = id;
+    });
+
+    // Oculta/muestra la pila con cualquier modal (diálogo, sheet, picker, popup…).
+    f7.on('modalOpen', (m) => { if (modalRelevante(m)) modalesAbiertos.value++; });
+    f7.on('modalClose', (m) => {
+      if (modalRelevante(m)) modalesAbiertos.value = Math.max(0, modalesAbiertos.value - 1);
     });
   });
 
