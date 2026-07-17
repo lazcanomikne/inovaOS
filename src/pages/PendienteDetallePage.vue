@@ -573,7 +573,7 @@ watch(() => store.tick, cargar);
 .evid-vacio i { font-size: 20px; color: var(--st-hoy); flex-shrink: 0; }
 .evid-grid { display: flex; flex-direction: column; gap: 10px; }
 .evid-item { border-radius: 14px; padding: 8px; display: flex; align-items: center; gap: 12px; }
-.evid-abrir { flex: 0 0 auto; border: none; background: transparent; padding: 0; cursor: pointer; }
+.evid-abrir { flex: 0 0 auto; width: 52px; height: 52px; border: none; background: transparent; padding: 0; cursor: pointer; line-height: 0; }
 .evid-meta { cursor: pointer; }
 .evid-thumb {
   width: 52px; height: 52px; border-radius: 10px; object-fit: cover; display: block; background: rgba(0,0,0,0.05);
