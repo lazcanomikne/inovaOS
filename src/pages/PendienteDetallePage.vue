@@ -135,11 +135,11 @@
 
         <div v-if="evidencias.length" class="evid-grid">
           <div v-for="e in evidencias" :key="e.id" class="glass evid-item">
-            <a :href="e.url" target="_blank" rel="noopener" class="evid-abrir">
+            <button type="button" class="evid-abrir" @click="abrirEvidencia(e)">
               <img v-if="esImagen(e)" :src="e.url" :alt="e.nombre" class="evid-thumb" />
               <div v-else class="evid-thumb evid-pdf"><i class="f7-icons">doc_text_fill</i></div>
-            </a>
-            <div class="evid-meta">
+            </button>
+            <div class="evid-meta" @click="abrirEvidencia(e)">
               <div class="evid-nombre">{{ e.nombre }}</div>
               <div class="evid-sub">{{ tamanoLegible(e.tamano) }}<span v-if="e.autor"> · {{ e.autor }}</span></div>
             </div>
@@ -155,6 +155,26 @@
           {{ subiendo ? 'Subiendo…' : 'Adjuntar evidencia' }}
         </f7-button>
       </div>
+
+      <!-- Visor de evidencias: abre el documento DENTRO de la app (en la PWA
+           instalada, target=_blank no abre pestañas). -->
+      <Teleport to="body">
+        <div v-if="viendo" class="evid-visor" @click.self="viendo = null">
+          <div class="evid-visor-barra">
+            <span class="evid-visor-nombre">{{ viendo.nombre }}</span>
+            <a :href="viendo.url" target="_blank" rel="noopener" class="evid-visor-btn" title="Abrir en el navegador">
+              <i class="f7-icons">arrow_up_right_square</i>
+            </a>
+            <button type="button" class="evid-visor-btn" @click="viendo = null" title="Cerrar">
+              <i class="f7-icons">xmark</i>
+            </button>
+          </div>
+          <div class="evid-visor-cuerpo">
+            <img v-if="esImagen(viendo)" :src="viendo.url" :alt="viendo.nombre" class="evid-visor-img" />
+            <iframe v-else :src="viendo.url" class="evid-visor-frame" title="Documento"></iframe>
+          </div>
+        </div>
+      </Teleport>
 
       <!-- Historial / trazabilidad (paso 8) -->
       <div class="block-title">Historial</div>
@@ -200,6 +220,8 @@ const p = ref(null);
 const historial = ref([]);
 const checklist = ref([]);
 const evidencias = ref([]);
+const viendo = ref(null); // evidencia abierta en el visor
+function abrirEvidencia(e) { viendo.value = e; }
 const nuevoItem = ref('');
 const usuarios = ref([]);
 const nuevoAsignado = ref(null);
@@ -551,7 +573,8 @@ watch(() => store.tick, cargar);
 .evid-vacio i { font-size: 20px; color: var(--st-hoy); flex-shrink: 0; }
 .evid-grid { display: flex; flex-direction: column; gap: 10px; }
 .evid-item { border-radius: 14px; padding: 8px; display: flex; align-items: center; gap: 12px; }
-.evid-abrir { flex: 0 0 auto; }
+.evid-abrir { flex: 0 0 auto; border: none; background: transparent; padding: 0; cursor: pointer; }
+.evid-meta { cursor: pointer; }
 .evid-thumb {
   width: 52px; height: 52px; border-radius: 10px; object-fit: cover; display: block; background: rgba(0,0,0,0.05);
 }
@@ -567,6 +590,25 @@ watch(() => store.tick, cargar);
   color: var(--st-vencido); opacity: 0.7;
 }
 .evid-del i { font-size: 20px; }
+
+/* Visor de evidencias a pantalla completa (abre dentro de la app) */
+.evid-visor {
+  position: fixed; inset: 0; z-index: 20000; background: rgba(8, 6, 16, 0.98);
+  display: flex; flex-direction: column;
+  padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
+}
+.evid-visor-barra { display: flex; align-items: center; gap: 10px; padding: 10px 14px; color: #fff; }
+.evid-visor-nombre { flex: 1 1 auto; min-width: 0; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evid-visor-btn {
+  flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; border: none;
+  background: rgba(255, 255, 255, 0.15); color: #fff; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; text-decoration: none;
+}
+.evid-visor-btn i { font-size: 20px; }
+.evid-visor-cuerpo { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: auto; }
+.evid-visor-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.evid-visor-frame { width: 100%; height: 100%; border: none; background: #fff; }
+
 .error-card { border-radius: 18px; padding: 16px; display: flex; gap: 12px; align-items: center; }
 .error-card i { font-size: 28px; color: var(--st-vencido); }
 .error-sub { font-size: 13px; opacity: 0.7; margin-top: 2px; }
